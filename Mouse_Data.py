@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 import os, re
 
-root = 'C:/Users/miksc/Documents/mStim_data/'
-
 class Mouse_Data:
     ''' Class designed for housing all data for an individual mouse
         
