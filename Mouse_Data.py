@@ -82,7 +82,7 @@ class Mouse_Data:
 
                     # Get the newly set intensity
                     try:
-                        intensity = np.int64(re.split(' |uA',i_change[2][change_idx])[-2].strip('.'))
+                        intensity = np.float64(re.split(' |uA',i_change[2][change_idx])[-2].strip('.'))
                     except:
                         break
 
