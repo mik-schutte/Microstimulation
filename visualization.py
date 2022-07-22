@@ -12,23 +12,31 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Times New Roman', 'axes.facecolor':'white'})   
 
-def plot_raster_rt(mouse, save=False):
+def plot_raster_rt(mouse, save=False, peak=False):
     ''' Creates a figure containing rasterplots of the trial response time.
 
         INPUT:
             mouse(Mouse_Data): Dataclass with attributes like id, sessions, all_data and concatenated data
             save(bool): prompts the user for destination folder path
+            peak(bool): if true only two session rasterplots will be created
         OUTPUT:
             raster_rt_plot(matplotlib.plt): either a plot is shown or saved
     '''
+    # Check for peaking allowing the user to only see the plots of the first 2 sessions
+    if peak:
+        n_sessions = 2
+    else:
+        n_sessions = len(mouse.sessions)
     # Set figure basics 
-    fig, axs = plt.subplots(1, len(mouse.sessions), figsize=(15, 10)) # Size plot according to the number of sessions
+    fig, axs = plt.subplots(1, n_sessions, figsize=(15, 10)) # Size plot according to the number of sessions
     plt.subplots_adjust(wspace=1,) 
     fig.patch.set_facecolor('white')
     fig.suptitle(str(mouse.id), y=1.05)
     
     # Get and plot data for every session
     for idx, session in enumerate(mouse.sessions):
+        if peak and idx == n_sessions:
+            break
         colors = []
         rt_full = mouse.all_data[session]['response_t']
         x = np.arange(0, len(rt_full), 1) # Initiate x-axis for plotting
@@ -77,7 +85,7 @@ def plot_raster_rt(mouse, save=False):
             axs.set_xlabel('Response time (s)')
             axs.set_title(str(session))
             legend = axs.legend(bbox_to_anchor=(0., 1.1, 1., .102), handles=[red_patch, gray_patch], mode="expand", borderaxespad=0., ncol=1)
-    
+            
     # Add colormap
     cmap_bar = matplotlib.cm.get_cmap('summer', len(intensity))
     cmappable = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(0,1), cmap=cmap_bar.reversed())
