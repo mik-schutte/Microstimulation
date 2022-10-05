@@ -1,0 +1,64 @@
+3.038710	200	200 0/0, Pairings: 2
+3.038720	120	Current Intensity 120uA
+3.243510	120	120 0/0, Pairings: 2
+3.243520	0	testing
+11.580920	120	120 0/1, Pairings: 0
+25.318870	120	120 0/1, Pairings: 0
+25.318880	0	testing
+40.513020	120	120 0/1, Pairings: 0
+77.592060	120	120 0/1, Pairings: 0
+77.592070	120	Current Intensity 120uA
+77.979110	120	120 0/0, Pairings: 0
+77.979120	0	testing
+217.435640	120	120 11/15, Pairings: 0
+217.435650	0	Current Intensity 110uA
+295.925240	0	110 10/10, Pairings: 0
+295.925250	100	Current Intensity 100uA
+442.293750	100	100 12/14, Pairings: 0
+442.293760	90	Current Intensity 90uA
+538.035670	90	90 10/10, Pairings: 0
+538.035680	80	Current Intensity 80uA
+650.821110	80	80 11/14, Pairings: 0
+650.821120	70	Current Intensity 70uA
+767.335910	70	70 8/13, Pairings: 0
+767.335920	60	Current Intensity 60uA
+1029.715430	60	60 21/30, Pairings: 0
+1029.715440	0	testing
+1040.780790	60	60 1/1, Pairings: 0
+1040.780800	50	Current Intensity 50uA
+1087.837670	50	50 4/11, Pairings: 0
+1087.837680	60	Current Intensity 60uA
+1090.141670	60	60 1/0, Pairings: 0
+1090.141680	0	testing
+1154.328060	60	60 10/11, Pairings: 0
+1154.328070	50	Current Intensity 50uA
+1230.206460	50	50 9/10, Pairings: 0
+1230.206470	40	Current Intensity 40uA
+1283.843580	40	40 8/10, Pairings: 0
+1283.843590	30	Current Intensity 30uA
+1340.675580	30	30 3/11, Pairings: 0
+1340.675590	40	Current Intensity 40uA
+1357.878780	40	40 0/2, Pairings: 0
+1359.795670	40	40 0/2, Pairings: 0
+1375.567350	40	40 0/2, Pairings: 0
+1375.567360	0	testing
+1424.541180	40	40 6/6, Pairings: 0
+1424.541190	30	Current Intensity 30uA
+1603.417590	30	30 9/11, Pairings: 0
+1603.417600	20	Current Intensity 20uA
+1660.040700	20	20 0/8, Pairings: 0
+1660.040710	30	Current Intensity 30uA
+1742.665190	30	30 5/11, Pairings: 0
+1747.334630	30	30 5/11, Pairings: 0
+1747.334640	30	Current Intensity 30uA
+1747.512790	30	30 0/0, Pairings: 0
+1747.518950	0	testing
+1821.756920	30	30 4/11, Pairings: 0
+1821.756930	40	Current Intensity 40uA
+1902.562790	40	40 9/14, Pairings: 0
+1902.562800	35	Current Intensity 35uA
+2070.115830	35	35 17/20, Pairings: 0
+2070.115840	30	Current Intensity 30uA
+2154.300920	30	30 12/14, Pairings: 0
+2154.300930	25	Current Intensity 25uA
+2239.014390	25	25 0/9, Pairings: 0
