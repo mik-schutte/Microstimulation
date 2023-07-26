@@ -146,7 +146,7 @@ def get_cum_score(mouse): #TODO change this to yield all parameters over all ses
         # Check if trail was a hit or miss
         for idx, trial in session_data.iterrows():
             total += 1
-            if trial['succes']:
+            if trial['type']!= 'pairData' and trial['succes']: # Not sure why this is in this commit, pairData is not important in new paradigm
                 hits += 1
             else:
                 misses += 1
