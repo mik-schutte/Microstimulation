@@ -121,7 +121,7 @@ class Mouse_Data:
             rawData = load_mat(self.path + file)
             session = rawData['__header__'].decode()
             session = re.split('Mon |Tue |Wed |Thur |Fri |Sat |Sun ', session)[-1] 
-            session = str(datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
+            session = str(datetime.datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
             
             # Check if a similar session is already in the dictionary
             if session in self.session_data.keys():
