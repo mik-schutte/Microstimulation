@@ -10,7 +10,7 @@ run in to as little problems as possible
 import numpy as np
 import os, cv2, re
 
-def grabReferenceFrame(videoPath, destfolder):
+def grabReferenceFrame(videoPath, destfolder, filename=1):
     ''' Opens a videofile, grabs the first frame and saves it as a reference for 
         snipping. To be used in conjunction with ImageJ for determining x & 
         y-coordinates used in functions like split_and_flip() and crop_for_pupil().
@@ -27,8 +27,10 @@ def grabReferenceFrame(videoPath, destfolder):
             referenceFrame: A .jpg file located at the destfolder.
     '''
     # Get filename and create the destfolder if needed
-    filename = videoPath.split('/ | \\')[-1].split('.')[0]
-    if destfolder[-1] is not '/ | \\':
+    if filename == 1:
+        filename = videoPath.split('/ | \\')[-1].split('.')[0]        
+
+    if destfolder[-1] != '/ | \\':
         destfolder = destfolder+'/'
     os.makedirs(destfolder, exist_ok=True)
 
@@ -40,12 +42,13 @@ def grabReferenceFrame(videoPath, destfolder):
             cv2.imwrite(destfolder+filename+'_ref.jpg', frame)
         else:
             print(f'FAILED to create a reference frame for {filename}')
+    print(destfolder+filename+'_ref.jpg')
     capr.release()
     cv2.destroyAllWindows()
     return
 
 
-def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False):
+def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False, filename=1):
     #TODO Finalize the docstring
     ''' Gets a videofile from path, reads, splits and flips each frame.
 
@@ -58,7 +61,8 @@ def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False):
             2 prepped .mp4 file located at the path_og_video/prepped folder         
     '''
     # Get filename and create a destination folder
-    filename = videoPath.split('/ | \\')[-1].split('.')[0]
+    if filename == 1:
+        filename = videoPath.split('/ | \\')[-1].split('.')[0]
     filetype = videoPath.split('/ | \\')[-1].split('.')[-1]
     os.makedirs(destfolder, exist_ok=True)
 
@@ -81,6 +85,7 @@ def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fourcc2 = cv2.VideoWriter_fourcc(*'mp4v')
     output = cv2.VideoWriter(destfolder+filename+'_left.'+filetype, fourcc, fps, (width, height))
+    print(destfolder+filename+'_left.'+filetype)
     output2 = cv2.VideoWriter(destfolder+filename+'_right.'+filetype, fourcc2, fps, (width2, height2))
 
     # Read and split
@@ -90,7 +95,6 @@ def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False):
     print(f'Writing snipped video: {filename}')
     iFrame = 0
     while True:
-        iFrame += 1
         success, frame = capr.read()
         if success:
             cropped_img = frame[0:og_height, 0:x_snip]
@@ -105,11 +109,27 @@ def splitVideo(videoPath, x_snip, destfolder, fps=200, flip=False):
                 break
         else:
             break 
+        iFrame += 1
 
     # Finish up
     print(f'Finished snipping {filename}')
+    print(framecount, iFrame)
     if framecount != iFrame:
         print(f'WARNING the number of frames is not equal to the original video!')
     capr.release()
     cv2.destroyAllWindows()
     return
+
+
+
+if __name__ == '__main__':
+    # videoFolder = 'E:/Videos/'
+    videoFolder = 'E:/Videos/' 
+    IDs = os.listdir(videoFolder)
+    for ID in IDs:
+        sessions = os.listdir(videoFolder+ID+'/')
+        for session in sessions:
+            filePath = videoFolder+ID+'/'+session
+            files = os.listdir(filePath)
+            grabReferenceFrame(filePath+'/'+files[0], destfolder='C:/Users/miksc/Desktop/refframes', filename=files[0].split('.')[0]+session)
+            
