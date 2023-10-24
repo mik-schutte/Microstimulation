@@ -120,7 +120,8 @@ class Mouse_Data:
         for file in self.files:
             rawData = load_mat(self.path + file)
             session = rawData['__header__'].decode()
-            session = re.split('Mon |Tue |Wed |Thur |Fri |Sat |Sun ', session)[-1] 
+            session = re.split('Mon |Tue |Wed |Thu |Fri |Sat |Sun ', session)[-1] 
+            print(session)
             session = str(datetime.datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
             
             # Check if a similar session is already in the dictionary
@@ -134,3 +135,4 @@ class Mouse_Data:
         for session in self.sessions:
             df_full = pd.concat([df_full, self.session_data[session]])
         self.full_data = df_full   
+
