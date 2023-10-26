@@ -77,21 +77,23 @@ def format_data(checked_data):
 
     stim_t = [trial['States']['Stimulus'][0] for trial in checked_data['SessionData']['RawEvents']['Trial']]
     df['stim_t'] = checked_data['SessionData']['TrialStartTimestamp'] + stim_t
-
-    response_t = [np.diff(trial['States']['WaitForLick'])[0] for trial in checked_data['SessionData']['RawEvents']['Trial']]
+    
+    response_t = [np.diff(trial['States']['WaitForLick'])[0] + 0.2 for trial in checked_data['SessionData']['RawEvents']['Trial']] # Added 200 ms so that it is the first lick post Stimulus onset (stim_t)
     df['response_t'] = response_t
 
     success = [np.isnan(trial['States']['Reward'][0]) for trial in checked_data['SessionData']['RawEvents']['Trial']]
-    df['success'] = np.invert(success)
+    df['success'] = np.invert(success)    # TODO succes should be capped within response window
 
     # Licks
+    # I dont think this takes in to account at which time the lick was conducted, but we can set this later for when the trial happened with stim_t
+    # Go through all trials and get the timestamp for when a lick (Port1 TTL) was detected
     for i in range(len(checked_data['SessionData']['RawEvents']['Trial'])):
         licks = np.array([])
-        if 'Port1In' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
-            licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['Port1In'])
-        if 'Port1Out' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
-            licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['Port1Out'])
-        df['licks'].iloc[i] = sorted(licks) # Apperently this is setting with a copy, but I failed to remove this error
+        if 'BNC1High' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
+            licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1High'])
+        if 'BNC1Low' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
+            licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1Low'])
+        df['licks'].iloc[i] = sorted(licks) + df['trialStart'].iloc[i] # Apperently this is setting with a copy, but I failed to remove this error so I silenced it
     return df
 
 class Mouse_Data:
@@ -121,7 +123,6 @@ class Mouse_Data:
             rawData = load_mat(self.path + file)
             session = rawData['__header__'].decode()
             session = re.split('Mon |Tue |Wed |Thu |Fri |Sat |Sun ', session)[-1] 
-            print(session)
             session = str(datetime.datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
             
             # Check if a similar session is already in the dictionary
