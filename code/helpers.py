@@ -11,6 +11,82 @@ from queue import Queue
 from copy import deepcopy
 from Mouse_Data import Mouse_Data
 
+def select_trialType(mouse_data, trialType):
+    ''' docstring
+        mouse_data: has to be either mouse_data.full_data or .session_data[session]
+    '''
+    # Define allowed trialtypes and check input
+    allowed_trialTypes = ['test', 1, 'catch', 2]
+    if trialType not in allowed_trialTypes:
+        raise NameError('trialType not found')
+    if not isinstance(mouse_data, pd.DataFrame):
+        raise TypeError('mouse_data is not a DataFrame, please select a mouse_data.full_data or mouse_data.session_data[session]')
+
+    # If a string is given change to the numerical code test=1, catch=2
+    if trialType == 'test':
+        trialType = 1
+    elif trialType == 'catch':
+        trialType = 2
+
+    # Now only select trials that are of the correct type
+    typeData = mouse_data.loc[mouse_data['trialType'] == trialType]
+    return typeData
+
+def get_FirstLick_idx(trialData):
+    '''docstring'''
+    # Unpack the licks and the stimulus time from the pd.Series
+    stim_t = trialData['stim_t']
+    licks = trialData['licks']
+
+    # Check if there where any licks during this trial
+    if len(licks) == 0:
+        return False
+    
+    # Now check if there was a lick after the stimulus at all 
+    postLicks = np.where(licks >= stim_t+0.2)[0] # NOTE it isn't exactly 200 ms its off by 0.2 ms
+    if len(postLicks) == 0:
+        return False
+    else: 
+        iFirstLick = postLicks[0]
+    return iFirstLick
+
+
+def check_lickPause(trialData): #So far this works every time (i.e. is not lower than 3s)
+    '''docstring'''
+    # Get the index of the first lick after stimulus
+    iFirstLick = get_FirstLick_idx(trialData)
+
+    # If this iFirstLick was False than there were either no licks, or no licks post stimulation
+    if iFirstLick:
+        licks = trialData['licks']
+        lickPause = licks[iFirstLick] - licks[iFirstLick-1]
+        return lickPause
+    else:
+        return False
+
+def curateLicks(trialData):
+    ''' Conduct pre-analysis concerning the responsetime when it is too close after stim onset. 	
+
+        NOTE: This will bess with the analysis of DLC data because there the animal receives water based on the start of the Reward State
+    '''
+    # Unpack some values for ease of usage
+    response_t = trialData['response_t']
+    licks = trialData['licks']
+    stim_t = trialData['stim_t']
+
+    # Check if the first lick occured 100 ms after the stimulus onset
+    # If licks were given before the end of the Stimulus State it won't be the same as the response_t
+    # This is because response_t is determined based on the beginning and end time of the WaitForLick state
+    # iFirstLick is based on the first lick after stim offset
+    iFirstLick = get_FirstLick_idx(trialData)
+
+    if iFirstLick: 
+        curatedLicks = licks[iFirstLick:] - stim_t
+    elif iFirstLick == False:
+        curatedLicks = np.array([])
+    return curatedLicks
+
+
 def get_trial_blocks(session_data):
     ''' Creates a list of trials blocks where each block is seperated by a stimulation change
         
