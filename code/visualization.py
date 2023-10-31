@@ -49,7 +49,7 @@ def plot_raster_rt(mouse_data, save=False, peak=False):
         
         # For pairing only pair and mix data are important
         # if catch:
-        select_data = mouse_data.session_data[session].loc[(mouse_data.session_data[session]['trialType'] == 2)|(mouse.session_data[session]['trialType'] == 1)|(mouse.session_data[session]['trialType'] == 'pairData')]        
+        select_data = mouse_data.session_data[session].loc[(mouse_data.session_data[session]['trialType'] == 2)|(mouse_data.session_data[session]['trialType'] == 1)|(mouse_data.session_data[session]['trialType'] == 'pairData')]        
         patches = [gray_patch, green_patch, red_patch, orange_patch]
         
         # Aquire response time, xticks and datatype
@@ -79,7 +79,7 @@ def plot_raster_rt(mouse_data, save=False, peak=False):
                 axs[idx].axvline(x, color='gray')
             offset = np.arange(0, len(rt), 1)
             axs[idx].eventplot(rt, lineoffsets=offset, linewidth=7.5, colors=colors)
-            axs[idx].set_xlim([-0.2, 1.55])
+            axs[idx].set_xlim([-0.2, 1.71])
             axs[idx].set_ylabel('Trial #')
             axs[idx].invert_yaxis()
             axs[idx].set_xlabel('Response time (s)')
@@ -93,7 +93,7 @@ def plot_raster_rt(mouse_data, save=False, peak=False):
                 axs.axvline(x, color='gray')
             offset = np.arange(0, len(rt), 1)
             axs.eventplot(rt, lineoffsets=offset, linewidth=7.5, colors=colors)
-            axs.set_xlim([-0.2, 1.55])
+            axs.set_xlim([-0.2, 1.71])
             axs.set_ylabel('Trial #')
             axs.invert_yaxis()
             axs.set_xlabel('Response time (s)')
@@ -326,6 +326,45 @@ def plot_lickPerformance(mouse_data, save=False, peak=False):
         axs[idx].set_xticks(np.arange(0, 1.8, 0.5))
 
     # After all trials have been plotted adjust all plots
+    plt.show()
+    return
+
+
+def plot_cumScore(mouse_data):
+    ''' Takes a list of mous_data, calculates their individual and average cumulative score and plots it
+    '''
+    # TODO Should be function for individual animal, experimental group and full experiment
+    # Thus mouse_data = Mouse_Data, [Mouse_Data] and [[Mouse_Data], [Mouse_Data]]
+
+    # Calculate the cumulative score
+    cum_scores = [] 
+    for mouse in mouse_data:
+        cum_score = get_cum_score(mouse)
+        cum_scores.append(cum_score)
+    cum_scores = extend_lists(cum_scores)
+
+    data = get_average_cum_score(cum_scores)
+
+    # Now plot
+    # Set figure basics 
+    fig = plt.figure(figsize=(16,6))
+    fig.patch.set_facecolor('white')
+    
+    # First plot the average lines
+    ctrl_line = plt.plot(data['avg'], linewidth=3, color='black')
+    # plt.legend(['Control', 'Anisomycin'])
+
+    # Add SEM
+    # Control
+    y_min = np.subtract(data['avg'], data['sem'])
+    y_max = np.add(data['avg'], data['sem'])
+    x = np.arange(0, len(data['avg']), 1)
+    plt.fill_between(x, y_min, y_max, alpha=0.5, color='black')
+
+    # Individual lines
+    for trace in data['raw']:
+        plt.plot(trace, c='gray')
+
     plt.show()
     return
 
