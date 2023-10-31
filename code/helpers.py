@@ -216,13 +216,16 @@ def get_cum_score(mouse): #TODO change this to yield all parameters over all ses
 
     # Go through all sessions
     for session in mouse.sessions:
-        session_data = mouse.all_data[session]
+        session_data = mouse.session_data[session]
         total, hits, misses = [0, 0, 0]
         
         # Check if trail was a hit or miss
-        for idx, trial in session_data.iterrows():
+        stimTrials = select_trialType(session_data, 1)
+        for idx, trial in stimTrials.iterrows():
+            if idx >= 150: # Note this should not be hardcoded
+                break
             total += 1
-            if trial['type']!= 'pairData' and trial['succes']: # Not sure why this is in this commit, pairData is not important in new paradigm
+            if trial['success']:
                 hits += 1
             else:
                 misses += 1
@@ -233,7 +236,9 @@ def get_cum_score(mouse): #TODO change this to yield all parameters over all ses
         
         # Add the last value of the previous session to make it cumulative
         last_score = trial_cum_score
+
     return cum_scores
+
 
 def get_average_cum_score(big_cum_score_list):
     ''' Calculate the average cumulative score and its standard deviation over a list of individual scores
@@ -247,22 +252,35 @@ def get_average_cum_score(big_cum_score_list):
     '''
     # Create a deepcopy of the original list because we'll be poppin' 'n droppin'
     copy_list = deepcopy(big_cum_score_list)
+    # TODO check if lists are of same length or if wre need to extend th elists
 
     # Get the maximal amount of trials that were conducted for each animal
-    max_len = np.max([len(cum_score_list) for cum_score_list in copy_list])
+    max_len = np.max([len(cum_score_list) for cum_score_list in copy_list]) # Should be at 150 trials
+    
+    data = {'raw': copy_list, 'avg': np.mean(copy_list), 'med':np.median(copy_list), 'std':np.std(copy_list) , 'sem':np.std(copy_list)/len(copy_list)} #parametrics
+
     average_list = []
+    median_list = []
     std_list = []
+    sem_list = []
 
     # Go through all trials, pop cum. score from their copied list
     for i in range(max_len):
         scores = [cum_score_list.pop(0) for cum_score_list in copy_list if cum_score_list]
         
         # Get standard deviation and average
-        std = np.std(scores)
-        std_list.append(std)
         average = np.average(scores)
         average_list.append(average)
-    return np.array(average_list), np.array(std_list)
+        median = np.median(scores)
+        median_list.append(median)
+        std = np.std(scores)
+        std_list.append(std)
+        sem = std / len(big_cum_score_list)
+        sem_list.append(sem)
+
+        # Add median, SEM
+    data = {'raw': big_cum_score_list, 'avg':average_list, 'std': std_list, 'med':median_list, 'sem':sem_list}
+    return data
 
 def get_blocked_score(original_list, n):
     ''' Iterate through a list, block values by n and calculate the average of that block
