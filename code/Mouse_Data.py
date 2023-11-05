@@ -8,7 +8,7 @@ import pandas as pd
 import os, re, datetime, scipy.io
 from scipy.io import matlab
 
-def load_mat(filename):
+def load_mat(filename): #TODO NOT MY CODE NORA GAVE TO ME
     """
     This function should be called instead of direct scipy.io.loadmat
     as it cures the problem of not properly recovering python dictionaries
@@ -70,7 +70,7 @@ def format_data(checked_data):
     Formats the checked data into a pandas DataFrame
     '''
     # Check for mat objects
-    df = pd.DataFrame(columns=['trialType', 'trialStart', 'trialEnd', 'stim_t', 'response_t', 'success', 'licks'])
+    df = pd.DataFrame(columns=['trialType', 'trialStart', 'trialEnd', 'stim_t', 'response_t', 'success', 'licks', 'whisker', 'pupil'])
     df['trialType'] = checked_data['SessionData']['TrialTypes']
     df['trialStart'] = checked_data['SessionData']['TrialStartTimestamp']
     df['trialEnd'] = checked_data['SessionData']['TrialEndTimestamp']
@@ -78,6 +78,8 @@ def format_data(checked_data):
     stim_t = [trial['States']['Stimulus'][0] for trial in checked_data['SessionData']['RawEvents']['Trial']]
     df['stim_t'] = checked_data['SessionData']['TrialStartTimestamp'] + stim_t
     
+    # The response time should be the first lick after stimulus onset for now.
+    # Since the diff in wait for lick calculated the time after stim offset we add 0.2s, to make it correspond with the Stim onset 
     response_t = [np.diff(trial['States']['WaitForLick'])[0] + 0.2 for trial in checked_data['SessionData']['RawEvents']['Trial']] # Added 200 ms so that it is the first lick post Stimulus onset (stim_t)
     df['response_t'] = response_t
 
@@ -124,7 +126,11 @@ class Mouse_Data:
             session = rawData['__header__'].decode()
             session = re.split('Mon |Tue |Wed |Thu |Fri |Sat |Sun ', session)[-1] 
             session = str(datetime.datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
-            
+
+            # Format the date as per (day_month_year) format
+            date_object = datetime.datetime.strptime(session, "%Y-%m-%d")
+            session = date_object.strftime("%d_%m_%Y")
+
             # Check if a similar session is already in the dictionary
             if session in self.session_data.keys():
                 print(f'WARNING: There is already data loaded for the session on {session}.\nPlease check validity.')
