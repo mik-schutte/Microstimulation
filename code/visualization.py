@@ -331,7 +331,7 @@ def plot_lickPerformance(mouse_data, save=False, peak=False):
 
 
 def plot_cumScore(mouse_data):
-    ''' Takes a list of mous_data, calculates their individual and average cumulative score and plots it
+    ''' Takes a list of mouse_data, calculates their individual and average cumulative score and plots it
     '''
     # TODO Should be function for individual animal, experimental group and full experiment
     # Thus mouse_data = Mouse_Data, [Mouse_Data] and [[Mouse_Data], [Mouse_Data]]
@@ -368,6 +368,69 @@ def plot_cumScore(mouse_data):
     plt.show()
     return
 
+def plot_groupCumScore(ctrl_data, exp_data):
+    ''' Takes a list of mous_data, calculates their individual and average cumulative score and plots it
+    '''
+    # TODO Should be function for individual animal, experimental group and full experiment
+    # Thus mouse_data = Mouse_Data, [Mouse_Data] and [[Mouse_Data], [Mouse_Data]]
+
+    # Calculate the cumulative score
+    ctrl_cum_scores = [] 
+    for mouse in ctrl_data:
+        cum_score = get_cum_score(mouse)
+        ctrl_cum_scores.append(cum_score)
+    ctrl_cum_scores = extend_lists(ctrl_cum_scores)
+    ctrl_data = get_average_cum_score(ctrl_cum_scores)
+
+    # Experimental group
+    exp_cum_scores = [] 
+    for mouse in exp_data:
+        cum_score = get_cum_score(mouse)
+        exp_cum_scores.append(cum_score)
+    exp_cum_scores = extend_lists(exp_cum_scores)
+    exp_data = get_average_cum_score(exp_cum_scores)
+
+
+    # Now plot
+    # Set figure basics 
+    fig = plt.figure(figsize=(16,6))
+    fig.patch.set_facecolor('white')
+
+    # Add SEM
+    # Control
+    y_min = np.subtract(ctrl_data['avg'], ctrl_data['sem'])
+    y_max = np.add(ctrl_data['avg'], ctrl_data['sem'])
+    x = np.arange(0, len(ctrl_data['avg']), 1)
+    plt.fill_between(x, y_min, y_max, alpha=0.5, color='black')
+
+    # Individual lines
+    for trace in ctrl_data['raw']:
+        plt.plot(trace, c='gray', alpha=0.5)
+
+    # Experimental group
+    # Add SEM
+    y_min = np.subtract(exp_data['avg'], exp_data['sem'])
+    y_max = np.add(exp_data['avg'], exp_data['sem'])
+    x = np.arange(0, len(exp_data['avg']), 1)
+    plt.fill_between(x, y_min, y_max, alpha=0.5, color='red')
+
+    for trace in exp_data['raw']:
+        plt.plot(trace, c='red', alpha=0.5)
+
+     # First plot the average lines
+    ctrl_line = plt.plot(ctrl_data['avg'], linewidth=3, color='black', label='Control')
+    exp_line = plt.plot(exp_data['avg'], linewidth=3, color='red', label='Rapamycin')
+    # plt.legend([ctrl_line, exp_line],['Control', 'Rapamycin'])
+    plt.legend()
+
+
+    # Make pretty
+    plt.ylabel(r'$\sum$ hits - misses')
+    plt.xlim([0, 300])
+    # plt.axhline(0, color='gray', linestyle='--', alpha=0.5)
+    plt.show()
+
+    return
 
 def get_hitnmiss(mouse_data):
     ''' docstring
