@@ -143,3 +143,58 @@ class Mouse_Data:
             df_full = pd.concat([df_full, self.session_data[session]])
         self.full_data = df_full   
 
+    def get_dlc(self, feature, file_end='.h5'):
+        ''' For a single Mouse_Data look for DLC files and add it to the .session_data and .full_data
+
+            INPUT:
+                mouse_data (Mouse_Data): 
+                feature(str): behavioural feature that is tracked by DLC, pupil or whisker
+                file_end(str): fileType ending that is used for searching DLC file
+            OUTPUT:
+                DLCdata(pd.DataFrame): like session_data, but with added raw DLC files for each trial. 
+        '''
+        # Check input
+        if feature not in ['pupil', 'whisker']:
+            TypeError(f'{feature} is not known please check spelling.')
+        if feature == 'whisker':
+            nFrames = 600
+        elif feature == 'pupil':
+            nFrames = 300
+
+        # Configure path from mouse.id
+        root = self.path.split('/Session Data/')[0]
+        feature_ext = '/Videos/' + feature + '/'
+
+        # Go through all sessions in Mouse_Data
+        for session in self.sessions:
+            # Check if the feature was recorded for that sessions
+            if session not in os.listdir(root+feature_ext):
+                print(f'{self.id} {session} doesnt seem to have any folder with recordings for the {feature} feature.')
+                continue
+
+            # Check if there are any DLC files 
+            dlcPath = root + feature_ext + session + '/'
+            dlc_files = [file for file in os.listdir(dlcPath) if file.endswith(file_end)] 
+            if len(dlc_files) == 0:
+                print(f'{session} doesnt have any DLC-files.')
+                continue
+
+            # Now read the trial DLC data and slice unneccesary scorer off
+            for file in dlc_files: 
+                trialDLC = pd.read_hdf(dlcPath + file)
+                trialDLC = trialDLC[trialDLC.keys()[0][0]]
+
+                # Get the trialNumber from the string
+                nTrial = int(file.split('DLC_')[0].split(feature+'_')[1])
+
+                # Check if the DLC file contains the right number of frames TODO likelihood needs to be done for each feature point individually
+                dlcSuccess = True
+                if len(trialDLC) != nFrames:
+                    dlcSuccess = False
+                
+                # Add the DLC data to the Mouse_Data
+                if dlcSuccess:
+                    self.session_data[session][feature][nTrial] = trialDLC       
+
+            # Update Mouse_Data.full_data by re-concatenating the sessions 
+            self.compile_data()
