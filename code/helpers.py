@@ -182,7 +182,7 @@ def get_threshold_data(mouse_list, min_score):
         threshold_data.append(threshold_list)
     return threshold_data 
 
-def get_avg_std_threshold(threshold_data, max_sessions=5):
+def get_avg_std_threshold(threshold_data, max_sessions=5): #TODO rename this function as it works for everything
     ''' Calculate the average threshold and its standard deviation for each session over a list of threshold lists
     
         INPUT:
@@ -375,3 +375,37 @@ def extend_lists(all_lists, max_len=0):
         l.extend([last_value]*fill_after)
         extended_lists.append(l)
     return extended_lists
+
+def get_PLick(mouse, catchInf=False):
+    # Hold the P(lick) over sessions in a list
+    mstimP_array = []
+    catchP_array = []
+    # Go through all training sessions and calculate the hit chance during mStim and catch
+    for session in mouse.sessions:
+        session_data = mouse.session_data[session]
+        mstim = select_trialType(session_data, 'test')
+        catch = select_trialType(session_data, 'catch')
+
+        # Now for the total of mstim and catch trials determing how many were a hit for that session
+        mstim_hit = mstim.loc[mstim['success'] == True]
+        catch_hit = catch.loc[catch['success'] == True]
+
+        # Now calculate the percentage of total trialTypes per session
+        mstimP = len(mstim_hit)/len(mstim)
+        catchP = len(catch_hit)/len(catch)
+
+        # Catch infinite values for d' calculation
+        if catchInf:
+            if mstimP == 1:
+                mstimP = (1-1/(2*len(mstim)))
+            elif mstimP == 0:
+                mstimP = (1/(2*(len(mstim))))
+            if catchP == 1:
+                catchP = (1-1/(2*len(catch)))
+            elif catchP == 0:
+                catchP = (1/(2*len(catch))) 
+
+        # Add the chance values to the array
+        mstimP_array.append(mstimP)
+        catchP_array.append(catchP)
+    return mstimP_array, catchP_array

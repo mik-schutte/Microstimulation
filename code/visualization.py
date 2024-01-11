@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from helpers import *
 from scipy.optimize import curve_fit 
-matplotlib.rcParams.update({'font.size':16, 'font.family':'Times New Roman', 'axes.facecolor':'white'})   
+matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})   
 
 def plot_raster_rt(mouse_data, save=False, peak=False):
     ''' Creates a figure containing rasterplots of the trial response time.
