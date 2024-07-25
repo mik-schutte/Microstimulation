@@ -79,9 +79,12 @@ def format_data(checked_data):
     df['stim_t'] = checked_data['SessionData']['TrialStartTimestamp'] + stim_t
     
     # The response time should be the first lick after stimulus onset for now.
-    # Since the diff in wait for lick calculated the time after stim offset we add 0.2s, to make it correspond with the Stim onset 
+    # Since the diff in wait for lick calculated the time after stim offset we add 0.2s, to make it correspond with the Stim onset
+    # !!!TODO!!!! hardcoded a + 0.2 to the response time 
     response_t = [np.diff(trial['States']['WaitForLick'])[0] + 0.2 for trial in checked_data['SessionData']['RawEvents']['Trial']] # Added 200 ms so that it is the first lick post Stimulus onset (stim_t)
     df['response_t'] = response_t
+
+    # We'll change the RT to the first lick 100 ms after stimulus onset, but how?
 
     success = [np.isnan(trial['States']['Reward'][0]) for trial in checked_data['SessionData']['RawEvents']['Trial']]
     df['success'] = np.invert(success)    # TODO succes should be capped within response window
@@ -95,9 +98,57 @@ def format_data(checked_data):
             licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1High'])
         if 'BNC1Low' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
             licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1Low'])
-        df['licks'].iloc[i] = sorted(licks) + df['trialStart'].iloc[i] # Apperently this is setting with a copy, but I failed to remove this error so I silenced it
+        df.at[i, 'licks'] = np.array(sorted(licks)) + df.loc[i, 'trialStart']
     return df
 
+def get_duplicates(folder): # Folder likely is root + ID, all files for animal
+    ''' Goes through all files in the folder and detects which session had duplicates
+        INPUT:
+            folder(str): path to the folder, likely root + ID + microstim + Session Data
+        OUTPUT:
+            duplicate_dict(dict): dictionary with keys being sessions that have duplicates
+                                  and values being all the files of that session
+    '''
+    # Make a file_list containing all files in the folder and get all session names
+    file_list = os.listdir(folder)
+    sessions = [re.split('microstim_', file)[1] for file in file_list] # Remove prefix
+    sessions = [re.split('.mat', file)[0] for file in sessions] # Remove .mat extension
+    session_date = [re.split('_',session)[0] for session in sessions] # Convert to only the date of the day
+
+    # Go trough all session dates and count the occurance if there are multiple they are duplicate sessions
+    duplicates = []
+    for session in session_date:
+        occurance = session_date.count(session)
+        if occurance > 1: 
+            duplicates.append(session)
+    duplicates = set(duplicates) # This is a set with the session dates of duplicates
+
+    # Create a nested dictionary with keys being a duplicate session and values as dictionary of behaviours
+    duplicate_dict = {}
+    for session in duplicates:
+        duplicate_dict[session] = [file for file in file_list if session in file]
+    return duplicate_dict
+
+def check_aborted(trialData):
+    ''' Uses all licks during the trial and the stimulus time to determine if no licks were made during the first 100ms of the stimulus.
+    
+    INPUT:
+        trialData (pd.series): single trail components of behaviour
+    OUTPUT:
+        bool_violate, violations (tup): a boolien stating if lick violations were found
+                                        and a list of which times this was.
+    '''
+    # Unpack variables from the trialData df
+    licks = trialData['licks']
+    stim_t = trialData['stim_t']
+
+    # If any licks happened during the first 100 ms of the stimulus 
+    bool_violate = any((licks >= stim_t) & (licks <= stim_t + 0.1))
+    violations = licks[np.where(np.logical_and(licks>=stim_t, licks<=stim_t+0.1))[0]]
+    return bool_violate, violations
+
+
+# Awesome Mouse_Data class
 class Mouse_Data:
     ''' Class designed for housing all data for an individual mouse
         
@@ -113,9 +164,15 @@ class Mouse_Data:
         self.path = path_to_data 
         self.files = os.listdir(self.path)
         self.id = self.files[0].split('/')[-1].split('_')[0]
+        self.concat_needed = False
         self.get_behaviour()
         self.sessions = [str(key) for key in self.session_data.keys()]
-        self.compile_data()
+
+        if self.concat_needed:
+            self.concat_data()
+
+        # self.update_aborted() 
+        self.compile_data() # Not necessary because update.aborted also compiles
 
     def get_behaviour(self):
         ''' Creates self.session_data a dictionary with keys being session_dates and values being a pd.Dataframe 
@@ -133,7 +190,8 @@ class Mouse_Data:
 
             # Check if a similar session is already in the dictionary
             if session in self.session_data.keys():
-                print(f'WARNING: There is already data loaded for the session on {session}.\nPlease check validity.')
+                print(f'WARNING: There is already data loaded for the session on {session} of {self.id}.\nData will be concatenated; please check validity.')
+                self.concat_needed = True
             self.session_data[session] = format_data(rawData)
     
     def compile_data(self):
@@ -143,7 +201,7 @@ class Mouse_Data:
             df_full = pd.concat([df_full, self.session_data[session]])
         self.full_data = df_full   
 
-    def get_dlc(self, feature, file_end='.h5'):
+    def get_dlc(self, feature, file_end='.h5'): # TODO check if dlc has already been loaded
         ''' For a single Mouse_Data look for DLC files and add it to the .session_data and .full_data
 
             INPUT:
@@ -198,3 +256,64 @@ class Mouse_Data:
 
             # Update Mouse_Data.full_data by re-concatenating the sessions 
             self.compile_data()
+
+    def concat_data(self):
+        ''' Go through all files, find duplicate sessions and concatenate the files
+        
+            INPUT:
+                folder(str): path to the raw folder that contains the .txt data
+            OUTPUT:
+                concatenated files: original files have been placed in the raw folder and
+                                    an 'old' folder has been added that houses the split data
+        ''' 
+        # Create a nested dictionary with keys being a duplicate session and values as dictionary of behaviours
+        duplicate_dict = get_duplicates(self.path)
+        
+        # Go through all duplicate sessions
+        for session in duplicate_dict.keys():
+            files_to_concatinate = duplicate_dict[session]
+
+            for i, file in enumerate(files_to_concatinate):
+                # load in file
+                rawData = load_mat(self.path + '/' + file)
+                df = format_data(rawData)
+
+                # If a previous df was loaded add the values together
+                if i > 0:
+                    # Adjust df with values from old_df  trialStart	trialEnd stim_t 
+                    # Licktimes of the df are based on BNC input + trialStart we need to remove trialStart again
+                    licks = df['licks'] - df['trialStart']
+
+                    endTime = old_df.iloc[-1]['trialEnd']
+                    df['trialStart'] = df['trialStart'] + endTime
+                    df['trialEnd'] = df['trialEnd'] + endTime
+                    df['stim_t'] = df['stim_t'] + endTime
+
+                    # Add the new trialStart to the lickTimes
+                    df['licks'] = licks + df['trialStart']
+
+                    df_concat = pd.concat([old_df, df], ignore_index=True)
+                old_df = df
+
+            # Format the date as per (day_month_year) format
+            date_object = datetime.datetime.strptime(session, "%Y%m%d")
+            session = date_object.strftime("%d_%m_%Y")
+            self.session_data[session] = df_concat
+            self.compile_data()
+
+    def update_aborted(self):
+        ''' docstring
+        '''  
+        for session in self.sessions:
+            session_data = self.session_data[session]
+
+            aborted_list = []
+            for i, trialData in session_data.iterrows():
+                bool_violate = check_aborted(trialData)
+                aborted_list.append(bool_violate)
+            
+            # New column
+            session_data['aborted'] = aborted_list
+
+        # Also updata full_data    
+        self.compile_data()
