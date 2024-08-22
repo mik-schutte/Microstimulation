@@ -113,12 +113,13 @@ def check_aborted(trialData):
     return bool_violate
 
 
-def get_PLick(mouse, catchInf=False):
-    ''' Calculates the chance of a lick during stim and catch trials for oall sessions
+def get_PLick(mouse, catchInf=True, binsize=0):
+    ''' Calculates the chance of a lick during stim and catch trials for all sessions with optional binning
 
     INPUT:
         mouse (Mouse_Data class): 
-        catchInf (bool): If True you will take into account 100% hits or misses
+        catchInf (bool): If True, you will take into account 100% hits or misses
+        binsize (int): Size of the bins to calculate P(lick). If 0, calculate over entire session.
 
     OUTPUT:
         mstimP_array, catchP_array (tuple): tuple of arrays of the chance to lick during stim and catch trials.
@@ -126,48 +127,79 @@ def get_PLick(mouse, catchInf=False):
     # Hold the P(lick) over sessions in a list
     mstimP_array = []
     catchP_array = []
-    # Go through all training sessions and calculate the hit chance during mStim and catch
-    for session in mouse.sessions:
-        session_data = mouse.session_data[session]
-        mstim = select_trialType(session_data, 'test')
-        catch = select_trialType(session_data, 'catch')
+    
 
-        # Now for the total of mstim and catch trials determing how many were a hit for that session
-        mstim_hit = mstim.loc[mstim['success'] == True]
-        catch_hit = catch.loc[catch['success'] == True]
+    if binsize > 0:
+        # Retrieve session data
+        session_data = mouse.full_data
+        # Calculate P(lick) using a sliding window
+        for start in range(len(session_data) - binsize):
+            bin_data = session_data.iloc[start:start + binsize]
+            
+            mstim = select_trialType(bin_data, 'test')
+            catch = select_trialType(bin_data, 'catch')
+            
+            mstim_hit = mstim.loc[mstim['success'] == True]
+            catch_hit = catch.loc[catch['success'] == True]
 
-        # Now calculate the percentage of total trialTypes per session
-        mstimP = len(mstim_hit)/len(mstim)
-        catchP = len(catch_hit)/len(catch)
+            mstimP = len(mstim_hit) / len(mstim) if len(mstim) > 0 else 0
+            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else 0
 
-        # Catch infinite values for d' calculation
-        if catchInf:
-            if mstimP == 1:
-                mstimP = (1-1/(2*len(mstim)))
-            elif mstimP == 0:
-                mstimP = (1/(2*(len(mstim))))
-            if catchP == 1:
-                catchP = (1-1/(2*len(catch)))
-            elif catchP == 0:
-                catchP = (1/(2*len(catch))) 
+            # Catch infinite values for d' calculation
+            if catchInf:
+                if mstimP == 1:
+                    mstimP = (1 - 1 / (2 * len(mstim)))
+                elif mstimP == 0:
+                    mstimP = (1 / (2 * len(mstim)))
+                if catchP == 1:
+                    catchP = (1 - 1 / (2 * len(catch)))
+                elif catchP == 0:
+                    catchP = (1 / (2 * len(catch)))
 
-        # Add the chance values to the array
-        mstimP_array.append(mstimP)
-        catchP_array.append(catchP)
+            mstimP_array.append(mstimP)
+            catchP_array.append(catchP)
+    else:
+        for session in mouse.sessions:
+            session_data = mouse.session_data[session]
+            # Calculate P(lick) for entire session
+            mstim = select_trialType(session_data, 'test')
+            catch = select_trialType(session_data, 'catch')
+
+            mstim_hit = mstim.loc[mstim['success'] == True]
+            catch_hit = catch.loc[catch['success'] == True]
+
+            mstimP = len(mstim_hit) / len(mstim) if len(mstim) > 0 else 0
+            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else 0
+
+            # Catch infinite values for d' calculation
+            if catchInf:
+                if mstimP == 1:
+                    mstimP = (1 - 1 / (2 * len(mstim)))
+                elif mstimP == 0:
+                    mstimP = (1 / (2 * len(mstim)))
+                if catchP == 1:
+                    catchP = (1 - 1 / (2 * len(catch)))
+                elif catchP == 0:
+                    catchP = (1 / (2 * len(catch)))
+
+            mstimP_array.append(mstimP)
+            catchP_array.append(catchP)
+
     return mstimP_array, catchP_array
 
 
-def calc_d_prime(mouse_data):
+def calc_d_prime(mouse_data, binsize=0):
     ''' Calculates the d' (Sensitivity index) for each session of mouse_data
 
     INPUT: 
         mouse_data (Class):
+        binsize (int): if this value is not zero then we will get Plick over the sessions otherwise we go through all trials and bin by the binsize
     OUTPUT:
         d_prime_list (list): list of the d'value for each session
     '''
     d_prime_list = []
     # Get P(lick) for catch and mStim trials for all sessions
-    mStim_Plicks, catch_Plicks = get_PLick(mouse_data, catchInf=True)
+    mStim_Plicks, catch_Plicks = get_PLick(mouse_data, catchInf=True, binsize=binsize)
 
     # For each session get the P(lick) for mStim and catch trails
     for mStim_Plick, catch_Plick in zip(mStim_Plicks, catch_Plicks):
@@ -198,7 +230,7 @@ def get_hitnmiss(mouse_data):
     return len(hits), len(misses)
 
 
-def calculate_response_times(ctrl_data, trial_type):
+def get_RT(ctrl_data, trial_type):
     '''Calculate average response times for a given trial type across sessions. 
 
     INPUT:
@@ -217,6 +249,27 @@ def calculate_response_times(ctrl_data, trial_type):
         rt_data.append(rt_indi)
     return rt_data
 
+def do_statistics(data1, data2):
+    '''docstring
+    '''
+    # Check for normality
+    stat1, p1 = sp.stats.shapiro(data1)
+    stat2, p2 = sp.stats.shapiro(data2)
+
+    if p1 > 0.05 and p2 > 0.05:
+        # Perform parametric test
+        # T-test
+        print('Data is normally distributed. Using T-test')
+        stat, p = sp.stats.ttest_rel(data1, data2)   
+    else:
+        print('Data is not normally distributed. Using Wilcox')
+        stat, p = sp.stats.wilcoxon(data1, data2)
+        # Perform non-parmetric test
+        # Wilcoxon
+
+    print(stat, p)
+    return stat, p
+   
 
 
 # LEGACY OLD CODE FOR WHEN WE STILL USED THE DECREASING STIM THRESHOLD
