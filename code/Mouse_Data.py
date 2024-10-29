@@ -129,6 +129,7 @@ def get_duplicates(folder): # Folder likely is root + ID, all files for animal
         duplicate_dict[session] = [file for file in file_list if session in file]
     return duplicate_dict
 
+<<<<<<< HEAD
 def check_aborted(trialData):
     ''' Uses all licks during the trial and the stimulus time to determine if no licks were made during the first 100ms of the stimulus.
     
@@ -149,6 +150,49 @@ def check_aborted(trialData):
 
 
 # Awesome Mouse_Data class
+=======
+# def concat_data(folder, Mouse_Data):
+#     ''' Go through all files, find duplicate sessions and concatenate the files
+    
+#         INPUT:
+#             folder(str): path to the raw folder that contains the .txt data
+#         OUTPUT:
+#             concatenated files: original files have been placed in the raw folder and
+#                                 an 'old' folder has been added that houses the split data
+#     ''' 
+#     # Create a nested dictionary with keys being a duplicate session and values as dictionary of behaviours
+#     duplicate_dict = get_duplicates(folder)
+    
+#     # Go through all duplicate sessions
+#     for session in duplicate_dict.keys():
+#         files_to_concatinate = duplicate_dict[session]
+
+#         for i, file in enumerate(files_to_concatinate):
+#             # load in file
+#             rawData = load_mat(folder + '/' + file)
+#             df = format_data(rawData)
+
+#             # If a previous df was loaded add the values together
+#             if i > 0:
+#                 # Adjust df with values from old_df  trialStart	trialEnd stim_t 
+#                 # Licktimes of the df are based on BNC input + trialStart we need to remove trialStart again
+#                 licks = df['licks'] - df['trialStart']
+
+#                 endTime = old_df.iloc[-1]['trialEnd']
+#                 df['trialStart'] = df['trialStart'] + endTime
+#                 df['trialEnd'] = df['trialEnd'] + endTime
+#                 df['stim_t'] = df['stim_t'] + endTime
+
+#                 # Add the new trialStart to the lickTimes
+#                 df['licks'] = licks + df['trialStart']
+
+#                 df_concat = pd.concat([old_df, df], ignore_index=True)
+#             old_df = df
+#         Mouse_Data.session_data[session] = df_concat
+#         Mouse_Data.compile_data()
+#         return Mouse_Data
+
+>>>>>>> faa83835691d45207735a9d2acd43de380756cef
 class Mouse_Data:
     ''' Class designed for housing all data for an individual mouse
         
@@ -173,6 +217,18 @@ class Mouse_Data:
 
         # self.update_aborted() 
         self.compile_data() # Not necessary because update.aborted also compiles
+
+        if self.concat_needed:
+            self.concat_data()
+            # new_self = self.concat_data(self.path, self)
+            # self.__dict__.update(new_self.__dict__)
+            # new_self = concat_data(self.path, self)
+            # print(new_self)
+            # print(self == new_self)
+
+            # self = new_self
+            # print(self == new_self)
+            # display(self.session_data['22_11_2023'])
 
     def get_behaviour(self):
         ''' Creates self.session_data a dictionary with keys being session_dates and values being a pd.Dataframe 
@@ -299,6 +355,7 @@ class Mouse_Data:
             date_object = datetime.datetime.strptime(session, "%Y%m%d")
             session = date_object.strftime("%d_%m_%Y")
             self.session_data[session] = df_concat
+<<<<<<< HEAD
             self.compile_data()
 
     def update_aborted(self):
@@ -317,3 +374,6 @@ class Mouse_Data:
 
         # Also updata full_data    
         self.compile_data()
+=======
+            self.compile_data()
+>>>>>>> faa83835691d45207735a9d2acd43de380756cef

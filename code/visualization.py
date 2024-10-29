@@ -12,6 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from helpers import *
 from scipy.optimize import curve_fit 
+<<<<<<< HEAD
 from matplotlib.gridspec import GridSpec
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})  
 
@@ -240,6 +241,9 @@ def omni_plot(mouse):
     d_ax.set_xlabel('Session')
     plt.show()
 
+=======
+matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})   
+>>>>>>> faa83835691d45207735a9d2acd43de380756cef
 
 def plot_raster_rt(mouse_data, save=False, peak=False):
     ''' Creates a figure containing rasterplots of the trial response time.
