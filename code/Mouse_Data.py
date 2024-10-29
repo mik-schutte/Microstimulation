@@ -199,7 +199,7 @@ class Mouse_Data:
         df_full = pd.DataFrame()
         for session in self.sessions:
             df_full = pd.concat([df_full, self.session_data[session]])
-        self.full_data = df_full   
+        self.full_data = df_full.reset_index(drop=True)   
 
     def get_dlc(self, feature, file_end='.h5'): # TODO check if dlc has already been loaded
         ''' For a single Mouse_Data look for DLC files and add it to the .session_data and .full_data
