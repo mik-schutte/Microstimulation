@@ -7,7 +7,8 @@
 '''
 import numpy as np
 import pandas as pd
-from scipy import stats
+import scipy as sp
+from scipy import stats, ndimage
 from queue import Queue
 from copy import deepcopy
 from Mouse_Data import Mouse_Data
@@ -112,7 +113,6 @@ def check_aborted(trialData):
     bool_violate = np.bool(np.size(violations))
     return bool_violate
 
-
 def get_PLick(mouse, catchInf=True, binsize=0):
     ''' Calculates the chance of a lick during stim and catch trials for all sessions with optional binning
 
@@ -132,30 +132,27 @@ def get_PLick(mouse, catchInf=True, binsize=0):
     if binsize > 0:
         # Retrieve session data
         session_data = mouse.full_data
+
+        # Add padding
+        last_rows = session_data.tail(int(binsize/2))
+        # Randomize last_rows
+        last_rows = last_rows.sample(frac=1).reset_index(drop=True)
+        session_data = pd.concat([session_data, last_rows, last_rows], ignore_index = True)
+        
         # Calculate P(lick) using a sliding window
         for start in range(len(session_data) - binsize):
-            bin_data = session_data.iloc[start:start + binsize]
             
+            bin_data = session_data.iloc[start:start + binsize]
+ 
             mstim = select_trialType(bin_data, 'test')
             catch = select_trialType(bin_data, 'catch')
             
             mstim_hit = mstim.loc[mstim['success'] == True]
             catch_hit = catch.loc[catch['success'] == True]
 
-            mstimP = len(mstim_hit) / len(mstim) if len(mstim) > 0 else 0
-            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else 0
-
-            # Catch infinite values for d' calculation
-            if catchInf:
-                if mstimP == 1:
-                    mstimP = (1 - 1 / (2 * len(mstim)))
-                elif mstimP == 0:
-                    mstimP = (1 / (2 * len(mstim)))
-                if catchP == 1:
-                    catchP = (1 - 1 / (2 * len(catch)))
-                elif catchP == 0:
-                    catchP = (1 / (2 * len(catch)))
-
+            mstimP = len(mstim_hit) / len(mstim) if len(mstim) > 0 else len(mstim_hit) / binsize # But the last values don't matter cuz they are fake i.e. duplicate of df.tail
+            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else len(mstim_hit) / binsize
+            
             mstimP_array.append(mstimP)
             catchP_array.append(catchP)
     else:
@@ -187,22 +184,31 @@ def get_PLick(mouse, catchInf=True, binsize=0):
 
     return mstimP_array, catchP_array
 
-
 def calc_d_prime(mouse_data, binsize=0):
     ''' Calculates the d' (Sensitivity index) for each session of mouse_data
 
     INPUT: 
         mouse_data (Class):
-        binsize (int): if this value is not zero then we will get Plick over the sessions otherwise we go through all trials and bin by the binsize
     OUTPUT:
         d_prime_list (list): list of the d'value for each session
     '''
     d_prime_list = []
     # Get P(lick) for catch and mStim trials for all sessions
-    mStim_Plicks, catch_Plicks = get_PLick(mouse_data, catchInf=True, binsize=binsize)
-
+    mStim_Plicks, catch_Plicks = get_PLick(mouse_data, binsize=binsize)
+    
     # For each session get the P(lick) for mStim and catch trails
     for mStim_Plick, catch_Plick in zip(mStim_Plicks, catch_Plicks):
+        # Catch infinite values for d' calculation
+        # Do 1-1/2N or 1/2N
+        if mStim_Plick == 1:
+            mStim_Plick = 1-1 / (2*binsize) # if len(mstim_bin) > 0 else 0.999
+        elif mStim_Plick == 0:
+            mStim_Plick = 1 / (2*binsize) #if len(mstim_bin) > 0 else 0.001
+        if catch_Plick == 1:
+            catch_Plick = 1 - 1 / (2*binsize) #if len(catch_bin) > 0 else 0.999
+        elif catch_Plick == 0:
+            catch_Plick = 1 / (2*binsize) #if len(catch_bin) > 0 else 0.001
+
         # Calculate the inverse of the cdf (ppf) of each P-value
         mStim_z = stats.norm.ppf(mStim_Plick)
         catch_z = stats.norm.ppf(catch_Plick)
@@ -210,6 +216,7 @@ def calc_d_prime(mouse_data, binsize=0):
         # Now calculate d' = |z(mStim hit) - z(catch hit)|
         d_prime_list.append(abs(mStim_z - catch_z))
     return d_prime_list
+
 
 
 def get_hitnmiss(mouse_data):
@@ -229,8 +236,21 @@ def get_hitnmiss(mouse_data):
     misses = mouse_data.loc[mouse_data['success'] == False]
     return len(hits), len(misses)
 
+def get_RT(mouse_data, trialType, binsize=0):
+    ''' Collect the responsetimes of a specific trialtype for session or full data
 
-def get_RT(ctrl_data, trial_type):
+    INPUT:
+        if mouse_data is full.data then we give all RTs otherwise we give them per session in a list
+    ''' 
+    # First select all response times for that trialType
+    type_data = select_trialType(mouse_data.loc[mouse_data['success'] == True], trialType)
+    if binsize > 0: 
+        RTs = np.convolve(type_data['response_t'], np.ones(binsize)/binsize, mode='valid')
+    else:
+        RTs = type_data['response_t']
+    return RTs
+
+def get_RTs(ctrl_data, trial_type): # NOTE this only goes through a list TODO this is an AVERAGE!!!
     '''Calculate average response times for a given trial type across sessions. 
 
     INPUT:
@@ -248,6 +268,31 @@ def get_RT(ctrl_data, trial_type):
             rt_indi.append(rt)
         rt_data.append(rt_indi)
     return rt_data
+
+def get_SEM(values, binsize=0):
+    """
+    Calculate the SEM within a sliding window across a list of values.
+    
+    Parameters:
+    - values: List or array of numerical values.
+    - binsize: Size of the sliding window.
+    
+    Returns:
+    - sem_values: List of SEM values for each sliding window position.
+    """
+    if binsize == 0:
+        print('Please provide binsize, this function only works as sliding window as of now')
+        return False
+    
+    sem_values = []
+    for i in range(len(values) - binsize + 1):
+        # Extract the current window of values
+        window = values[i:i + binsize]
+        
+        # Calculate the standard deviation and SEM
+        sem = np.std(window, ddof=1) / np.sqrt(len(window))
+        sem_values.append(sem)
+    return sem_values
 
 def do_statistics(data1, data2):
     '''docstring
