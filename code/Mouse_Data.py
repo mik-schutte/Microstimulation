@@ -1,69 +1,14 @@
 ''' Mouse_Data.py
 
-    Contains the Mouse_Data class that is used for analysing the SPIKE2 data .txt files.
+    Contains the Mouse_Data class that is used for analysing the BPOD data .mat files.
     @Mik Schutte
 '''
 import numpy as np
 import pandas as pd
 import os, re, datetime, scipy.io
 from scipy.io import matlab
+from pymatreader import read_mat
 
-def load_mat(filename): #TODO NOT MY CODE NORA GAVE TO ME
-    """
-    This function should be called instead of direct scipy.io.loadmat
-    as it cures the problem of not properly recovering python dictionaries
-    from mat files. It calls the function check keys to cure all entries
-    which are still mat-objects
-    """
-
-    def _check_vars(d):
-        """
-        Checks if entries in dictionary are mat-objects. If yes
-        todict is called to change them to nested dictionaries
-        """
-        for key in d:
-            if isinstance(d[key], matlab.mio5_params.mat_struct):
-                d[key] = _todict(d[key])
-            elif isinstance(d[key], np.ndarray):
-                d[key] = _toarray(d[key])
-        return d
-    
-    def _todict(matobj):
-        """
-        A recursive function which constructs from matobjects nested dictionaries
-        """
-        d = {}
-        for strg in matobj._fieldnames:
-            elem = matobj.__dict__[strg]
-            if isinstance(elem, matlab.mio5_params.mat_struct):
-                d[strg] = _todict(elem)
-            elif isinstance(elem, np.ndarray):
-                d[strg] = _toarray(elem)
-            else:
-                d[strg] = elem
-        return d
-
-    def _toarray(ndarray):
-        """
-        A recursive function which constructs ndarray from cellarrays
-        (which are loaded as numpy ndarrays), recursing into the elements
-        if they contain matobjects.
-        """
-        if ndarray.dtype != 'float64':
-            elem_list = []
-            for sub_elem in ndarray:
-                if isinstance(sub_elem, matlab.mio5_params.mat_struct):
-                    elem_list.append(_todict(sub_elem))
-                elif isinstance(sub_elem, np.ndarray):
-                    elem_list.append(_toarray(sub_elem))
-                else:
-                    elem_list.append(sub_elem)
-            return np.array(elem_list, dtype='object')
-        else:
-            return ndarray
-
-    data = scipy.io.loadmat(filename, struct_as_record=False, squeeze_me=True)
-    return _check_vars(data)
 
 def format_data(checked_data):
     '''
@@ -129,7 +74,6 @@ def get_duplicates(folder): # Folder likely is root + ID, all files for animal
         duplicate_dict[session] = [file for file in file_list if session in file]
     return duplicate_dict
 
-<<<<<<< HEAD
 def check_aborted(trialData):
     ''' Uses all licks during the trial and the stimulus time to determine if no licks were made during the first 100ms of the stimulus.
     
@@ -150,49 +94,6 @@ def check_aborted(trialData):
 
 
 # Awesome Mouse_Data class
-=======
-# def concat_data(folder, Mouse_Data):
-#     ''' Go through all files, find duplicate sessions and concatenate the files
-    
-#         INPUT:
-#             folder(str): path to the raw folder that contains the .txt data
-#         OUTPUT:
-#             concatenated files: original files have been placed in the raw folder and
-#                                 an 'old' folder has been added that houses the split data
-#     ''' 
-#     # Create a nested dictionary with keys being a duplicate session and values as dictionary of behaviours
-#     duplicate_dict = get_duplicates(folder)
-    
-#     # Go through all duplicate sessions
-#     for session in duplicate_dict.keys():
-#         files_to_concatinate = duplicate_dict[session]
-
-#         for i, file in enumerate(files_to_concatinate):
-#             # load in file
-#             rawData = load_mat(folder + '/' + file)
-#             df = format_data(rawData)
-
-#             # If a previous df was loaded add the values together
-#             if i > 0:
-#                 # Adjust df with values from old_df  trialStart	trialEnd stim_t 
-#                 # Licktimes of the df are based on BNC input + trialStart we need to remove trialStart again
-#                 licks = df['licks'] - df['trialStart']
-
-#                 endTime = old_df.iloc[-1]['trialEnd']
-#                 df['trialStart'] = df['trialStart'] + endTime
-#                 df['trialEnd'] = df['trialEnd'] + endTime
-#                 df['stim_t'] = df['stim_t'] + endTime
-
-#                 # Add the new trialStart to the lickTimes
-#                 df['licks'] = licks + df['trialStart']
-
-#                 df_concat = pd.concat([old_df, df], ignore_index=True)
-#             old_df = df
-#         Mouse_Data.session_data[session] = df_concat
-#         Mouse_Data.compile_data()
-#         return Mouse_Data
-
->>>>>>> faa83835691d45207735a9d2acd43de380756cef
 class Mouse_Data:
     ''' Class designed for housing all data for an individual mouse
         
@@ -220,22 +121,13 @@ class Mouse_Data:
 
         if self.concat_needed:
             self.concat_data()
-            # new_self = self.concat_data(self.path, self)
-            # self.__dict__.update(new_self.__dict__)
-            # new_self = concat_data(self.path, self)
-            # print(new_self)
-            # print(self == new_self)
-
-            # self = new_self
-            # print(self == new_self)
-            # display(self.session_data['22_11_2023'])
 
     def get_behaviour(self):
         ''' Creates self.session_data a dictionary with keys being session_dates and values being a pd.Dataframe 
         '''
         self.session_data = {}
         for file in self.files:
-            rawData = load_mat(self.path + file)
+            rawData = read_mat(self.path + file)
             session = rawData['__header__'].decode()
             session = re.split('Mon |Tue |Wed |Thu |Fri |Sat |Sun ', session)[-1] 
             session = str(datetime.datetime.strptime(session, '%b %d %X %Y')).split()[0] # It's possible to recover time by not slicing this string or [-1]
@@ -331,7 +223,7 @@ class Mouse_Data:
 
             for i, file in enumerate(files_to_concatinate):
                 # load in file
-                rawData = load_mat(self.path + '/' + file)
+                rawData = read_mat(self.path + '/' + file)
                 df = format_data(rawData)
 
                 # If a previous df was loaded add the values together
@@ -355,7 +247,6 @@ class Mouse_Data:
             date_object = datetime.datetime.strptime(session, "%Y%m%d")
             session = date_object.strftime("%d_%m_%Y")
             self.session_data[session] = df_concat
-<<<<<<< HEAD
             self.compile_data()
 
     def update_aborted(self):
@@ -374,6 +265,3 @@ class Mouse_Data:
 
         # Also updata full_data    
         self.compile_data()
-=======
-            self.compile_data()
->>>>>>> faa83835691d45207735a9d2acd43de380756cef
