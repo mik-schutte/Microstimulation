@@ -9,7 +9,7 @@ import os, re, datetime, scipy.io
 from scipy.io import matlab
 from pymatreader import read_mat
 
-
+# Issure here with string as integer
 def format_data(checked_data):
     '''
     Formats the checked data into a pandas DataFrame
@@ -106,7 +106,7 @@ class Mouse_Data:
 
     def __init__(self, path_to_data): 
         # From path_to_data get path and files in the raw-folder of that path
-        self.path = path_to_data 
+        self.path = path_to_data + 'microstim/Session Data/'
         self.files = os.listdir(self.path)
         self.id = self.files[0].split('/')[-1].split('_')[0]
         self.concat_needed = False
