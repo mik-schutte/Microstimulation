@@ -14,6 +14,8 @@ from helpers import *
 from scipy.optimize import curve_fit 
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
+from scipy.stats import gaussian_kde
+
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})  
 
 
@@ -567,6 +569,75 @@ def plot_lickPerformance(mouse_data, save=False, peak=False):
         fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
         fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600)
 
+    plt.show()
+
+
+def plot_FLicks(mouse, save=False):
+    """
+    Plot the kernel density estimation (KDE) of first lick response times 
+    for mStim and Catch trials from the last session of each mouse.
+
+    Parameters:
+    - mice: A single mouse object or a list of mouse objects
+    """
+
+    RTs_mstim = []
+    RTs_catch = []
+
+    # Select the last session
+    session = mouse.sessions[-1]  # Last session
+    session_data = mouse.session_data[session]
+
+    # Select trial types and filter for success
+    mstim = select_trialType(session_data, 'test')
+    catch = select_trialType(session_data, 'catch')
+    mstim = mstim[mstim['success'] == True]
+    catch = catch[catch['success'] == True]
+
+    if not mstim.empty:
+        RTs_mstim.append(mstim['response_t'])
+
+    if not catch.empty:
+        RTs_catch.append(catch['response_t'])
+
+    # Combine into single series (skip if no data)
+    RTs_mstim = pd.concat(RTs_mstim) if RTs_mstim else pd.Series(dtype=float)
+    RTs_catch = pd.concat(RTs_catch) if RTs_catch else pd.Series(dtype=float)
+
+    # X-axis for KDE
+    x = np.arange(-1, 2, 0.01)
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(6, 6))
+    [ax.axvline(i, ymin=0, ymax=3, c='gray', alpha=0.1) for i in np.arange(0, 0.2, 0.001)]
+
+    # KDE lines
+    if not RTs_mstim.empty:
+        density_mstim = gaussian_kde(RTs_mstim)
+        ax.plot(x, density_mstim(x), c='green', label=r'$\mu$Stim')
+
+    if not RTs_catch.empty:
+        density_catch = gaussian_kde(RTs_catch)
+        ax.plot(x, density_catch(x), c='gray', label='Catch')
+    else:
+        ax.plot(x, np.zeros(len(x)), c='gray', label='Catch (no data)')
+
+    # Formatting
+    ax.set_xlim([-1, 2])
+    ax.set_ylim([-0.2, 5])
+    ax.set_xlabel('Time from Stimulus Onset (s)')
+    ax.set_ylabel('First Licks (Hz)')
+    ax.set_title('First Licks (KDE) — Last Session')
+    ax.legend()
+    plt.tight_layout()
+
+    # Save the plot
+    if save:
+        save = Path(save)
+        os.makedirs(save.parent, exist_ok=True)
+        print(f'Saving to: {save }')
+        fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
+        fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600) 
     plt.show()
 
 
