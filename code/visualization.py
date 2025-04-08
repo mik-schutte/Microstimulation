@@ -14,6 +14,7 @@ from helpers import *
 from scipy.optimize import curve_fit 
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
+from collections import deque
 from scipy.stats import gaussian_kde
 
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})  
@@ -445,7 +446,7 @@ def plot_performance(mouse_data, save=False, average=False):
     axs.set_ylim([0, 110])
 
     axs.set_xticks(xticks)
-    axs.set_xticklabels([1,2,3,4])
+    # axs.set_xticklabels([1,2,3,4]) # When enabled it can yield error if you have too many sessions
     axs.set_xlabel('Session')
     
     # Add legend
@@ -666,8 +667,10 @@ def plot_Plick(mouse_data, save=False):
 
     # Set plot title and labels
     axs.set_title(mouse_data.id)  # Set the plot title to mouse id (if desired)
-    axs.set_xticks([0,1,2,3])
-    axs.set_xticklabels([1, 2, 3, 4])  # Set custom x-axis tick labels
+
+    xticks = np.arange(0, len(mstimP), 1)
+    axs.set_xticks(xticks)
+    axs.set_xticklabels(xticks+1)  # Set custom x-axis tick labels
     axs.set_xlabel('Session')  # Set x-axis label to 'Session'
     axs.set_ylabel('P(lick)')  # Set y-axis label to 'P(lick)'
 
@@ -751,13 +754,16 @@ def plot_RT(mouse_data, save=False, sem=True):
         ax.errorbar(x_catch, catch_mean, yerr=catch_std, c='black', capsize=4, zorder=1)
 
     # Set plot limits, ticks, labels, and display the legend
-    ax.set_ylim([0, 1.2])
-    ax.set_yticks(np.arange(0.2, 1.4, 0.2))
-    ax.set_xlim([-0.5, len(stim_mean) - 0.5])  # Adjust x-axis limits based on number of sessions
-    ax.set_xticks([0,1,2,3])
-    ax.set_xticklabels([1,2,3,4])
+    ax.set_ylim([0, 1.6])
+    ax.set_yticks(np.arange(0.0, 1.8, 0.2))
+
+    # ax.set_xlim([-0.5, len(stim_mean) - 0.5])  # Adjust x-axis limits based on number of sessions
+    xticks = np.arange(0, len(stim_mean), 1)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticks+1)
     ax.set_ylabel('Response time (s)')
     ax.set_xlabel('Session')
+    ax.legend(loc='upper right')
 
     # Save figure if requested
     if save:
@@ -775,32 +781,41 @@ def plot_RT(mouse_data, save=False, sem=True):
 def plot_d_prime(mouse_data, save=False):
     if not isinstance(mouse_data, list):
         mouse_data = [mouse_data]
-    mega_d = []
+    mega_d = [] # Create a list of dprimes for each session
     for mouse in mouse_data:
         d_prime_list = calc_d_prime(mouse)
         mega_d.append(d_prime_list)
 
-    avg_list, std_list = get_avg_std_threshold(mega_d, max_sessions=4)
+    # TODO why individual function and max_sessions given?
+    # TODO remove this function and replace by np.mean and np.std
+    # TODO what is the std from, dprime over single session? std is zero if iterating over single session
+    avg_list, std_list = get_avg_std_threshold(mega_d, max_sessions=3) # avg_list is the average dprime of each session in an individual mouse
+
+    xticks = np.arange(0, len(avg_list), 1)
+    # print(avg_list)
+    # avg_list = np.mean(mega_d, axis=0) # This is
+    # print(avg_list)
+
 
     # Ploterdeplot
     fig = plt.figure(figsize=(3,6))
     # Individual lines and points
     [plt.plot(d_prime, c='black', alpha=0.25) for d_prime in mega_d] 
-    [plt.scatter(x=[0,1,2,3],y=d_prime, c='black', alpha=0.3) for d_prime in mega_d]  
+    [plt.scatter(x=xticks,y=d_prime, c='black', alpha=0.3) for d_prime in mega_d]  
     # Average
     plt.plot(avg_list, c='black', linewidth=2)
-    plt.scatter(x=[0,1,2,3], y=avg_list, c='black', linewidths=2)
+    plt.scatter(x=xticks, y=avg_list, c='black', linewidths=2)
 
     # SEM
     sem_list = np.array(std_list)/len(mouse_data)
     if len(mouse_data) > 1:
-        plt.errorbar([0,1,2,3], avg_list, yerr=sem_list, c='black',capsize=5)
+        plt.errorbar(xticks, avg_list, yerr=sem_list, c='black',capsize=5)
 
     # Format
     plt.ylim([-0.05, np.max(avg_list)+0.1])
     # plt.yticks([0,1,2,3,4])
     plt.ylabel('d\' (Sensitivity Index)')
-    plt.xticks([0,1,2,3], [1,2,3,4])
+    # plt.xticks(xticks, [1,2,3,4])
     plt.xlabel('Session')
 
     if save:
@@ -811,6 +826,75 @@ def plot_d_prime(mouse_data, save=False):
         fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600) 
     plt.show()
 
+
+def plot_falsePositives(mouse_data, save=False, max_n=10, skip_first_n=0):
+    # Not very necessary plot tbh
+    """
+    Plot the progression of false positives (successes on catch trials) across sessions for a given mouse.
+
+    Parameters:
+    - mouse_data: A mouse object with .sessions and .all_data attributes.
+    - max_n (int): Size of the running average window.
+    - skip_first_n (int): Number of initial trials to ignore when plotting.
+    
+    Returns:
+    - FP_dict: Dictionary of false positive average scores per session.
+    """
+    # Extract some information we are to use later
+    n_sessions = len(mouse_data.sessions)
+    FP_dict = {}
+    max_trial_lengths = []
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    cmap = plt.get_cmap("tab10")  # Dynamic colors
+
+    for sesh_idx, session in enumerate(mouse_data.sessions):
+        data = mouse_data.session_data[session]
+
+        # Get catch trials
+        catch_trials = select_trialType(data, 2)
+        max_trial_lengths.append(len(catch_trials))
+
+        # Running calculation
+        FP_scores = []
+        running_window = deque(maxlen=max_n)
+        total_trials = hits = 0
+
+        for _, trial in catch_trials.iterrows():
+            total_trials += 1
+            if trial['success']:
+                hits += 1
+            score = (hits / total_trials) * 100  # FP percentage
+            running_window.append(score)
+            FP_scores.append(np.mean(running_window))
+
+        # Skip first N if specified
+        FP_avg_trimmed = FP_scores[skip_first_n:]
+
+        # Normalize x-axis to 0–100%
+        # x_vals = np.linspace(0, 100, len(FP_avg_trimmed)) # Plot the percentage of completed catch trials as x-axis
+        x_vals = np.arange(skip_first_n, skip_first_n + len(FP_avg_trimmed)) # PLot actual X trials
+        ax.plot(x_vals, FP_avg_trimmed, label=session, color=cmap(sesh_idx % 10))
+        FP_dict[sesh_idx] = FP_avg_trimmed
+
+    # Plot formatting
+    ax.set_title(f'Progression of False Positives \n{mouse_data.id}')
+    # ax.set_xlabel('Completed Catch Trials (%)')
+    ax.set_xlabel('Catch trial #')
+    ax.set_ylabel('False Positive Rate (%)')
+    ax.legend()
+    plt.tight_layout()
+    
+    # Save
+    if save:
+        save = Path(save)
+        os.makedirs(save.parent, exist_ok=True)
+        print(f'Saving to: {save }')
+        fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
+        fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600) 
+    plt.show()
+
+    return 
     
 # Group plots showing differences between conditions
 def plot_d_prime_comparison(*args, legend_names=None, colors=None):
