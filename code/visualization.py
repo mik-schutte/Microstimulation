@@ -698,6 +698,123 @@ def plot_Plick(mouse_data, save=False):
     plt.show()
     return
 
+def plot_metrics(mouse, save=False):
+    ''' The plot for showing all behavioural data: Plick, dprime, Rate Correct, RT
+    '''
+    fig = plt.figure(figsize=(15, 10))  # Adjusted figure size for 2 rows x 2 columns
+    fig.suptitle(mouse.id)
+    fig.patch.set_facecolor('white')
+    gs0 = GridSpec(2, 2, height_ratios=[1, 1], wspace=0.3, hspace=0.3)  # Adjusted for 2 rows, 2 columns
+    
+    # PLICK
+    Plick_ax = fig.add_subplot(gs0[0, 0])
+    mstimP, catchP = get_PLick(mouse)
+    Plick_ax.plot(mstimP, color='green', alpha=1, label=r'$\mu$Stim')
+    Plick_ax.plot(catchP, color='orange', alpha=1, label='Catch') 
+    xticks = np.arange(0, len(mstimP), 1)
+    Plick_ax.scatter(xticks, mstimP, c='green')
+    Plick_ax.scatter(xticks, catchP, c='orange')
+    Plick_ax.set_xticks(xticks)
+    Plick_ax.set_xticklabels(xticks+1)
+    Plick_ax.set_xlabel('Session')
+    Plick_ax.set_ylabel('P(lick)')
+    Plick_ax.set_ylim([-0.05, 1.05])
+    Plick_ax.legend(loc='upper left')
+
+    # RT
+    RT_ax = fig.add_subplot(gs0[0, 1])
+    RT_dict = {'stim': [], 'catch': []}
+    rt_stim_indi = []
+    rt_catch_indi = []
+
+    for session_name in mouse.sessions:
+        session = mouse.session_data[session_name]
+        stim_trials = select_trialType(session, 'test')
+        stim_trials = stim_trials.loc[stim_trials['success'] == True]
+        rt_stim = np.average(stim_trials['response_t'])
+        rt_stim_indi.append(rt_stim)
+        catch_trials = select_trialType(session, 'catch')
+        catch_trials = catch_trials.loc[catch_trials['success'] == True]
+        rt_catch = np.average(catch_trials['response_t'])
+        rt_catch_indi.append(rt_catch)
+
+        RT_dict['stim'].append(rt_stim_indi)
+        RT_dict['catch'].append(rt_catch_indi)
+
+    stim_avg = np.average(RT_dict['stim'], axis=0)
+    catch_avg = np.average(RT_dict['catch'], axis=0)
+    stim_std = np.std(RT_dict['stim'], axis=1)
+    catch_std = np.std(RT_dict['catch'], axis=1)
+    x = np.arange(len(stim_avg))
+    RT_ax.plot(stim_avg, label='Stim', c='green')
+    RT_ax.scatter(x, stim_avg, c='green')
+    RT_ax.plot(catch_avg, label='Catch', c='orange')
+    RT_ax.scatter(x, catch_avg, c='orange')
+    RT_ax.errorbar(x, stim_avg, yerr=stim_std, c='green', capsize=5)
+    RT_ax.errorbar(x, catch_avg, yerr=catch_std, c='orange', capsize=5)
+    RT_ax.set_ylim([0, 1.2])
+    RT_ax.set_yticks(np.arange(0, 1.2, 0.2))
+    RT_ax.set_xlim([-0.5, len(stim_avg) - 0.5])
+    RT_ax.set_xticks(x)
+    RT_ax.set_xticklabels(x+1)
+    RT_ax.set_ylabel('Response time (s)')
+    RT_ax.set_xlabel('Session')
+
+    # Rate correct
+    rate_ax = fig.add_subplot(gs0[1, 0])
+    n_sessions = len(mouse.sessions)
+    xticks = np.arange(0, n_sessions, 1)
+
+    for n_session in xticks:
+        session = mouse.sessions[n_session]
+        testData = select_trialType(mouse.session_data[session], 'test')
+        catchData = select_trialType(mouse.session_data[session], 'catch')
+        mHit, mMiss = get_hitnmiss(testData)
+        mTotal = mHit + mMiss
+        cHit, cMiss = get_hitnmiss(catchData)
+        cTotal = cHit + cMiss
+        hit_rate = mHit / mTotal * 100
+        FP_rate = cHit / cTotal * 100
+        effect_rate = hit_rate - FP_rate
+        rate_ax.bar([n_session - 0.2, n_session, n_session + 0.2], [hit_rate, FP_rate, effect_rate], color=['green', 'orange', 'black'], width=0.2)
+
+    rate_ax.set_ylabel('Percentage (%)')
+    rate_ax.set_ylim([0, 110])
+    rate_ax.set_xticks(xticks)
+    rate_ax.set_xticklabels(xticks + 1)
+    rate_ax.set_xlabel('Session')
+    blue_patch = matplotlib.patches.Patch(color='green', label='Hit')
+    red_patch = matplotlib.patches.Patch(color='orange', label='FP')
+    yellow_patch = matplotlib.patches.Patch(color='black', label='Hit - FPs')
+    rate_ax.legend(bbox_to_anchor=(0.005, 0.89, 1., .102), handles=[blue_patch, red_patch, yellow_patch], loc='upper left', borderaxespad=0., ncol=1)
+
+    # d-prime
+    d_ax = fig.add_subplot(gs0[1, 1])
+    mega_d = []
+    d_prime_list = calc_d_prime(mouse)
+    mega_d.append(d_prime_list)
+    avg_list, std_list = get_avg_std_threshold(mega_d, max_sessions=len(mouse.sessions))
+    [d_ax.plot(d_prime, c='black', alpha=0.25) for d_prime in mega_d]
+    [d_ax.scatter(x=np.arange(0, len(d_prime), 1), y=d_prime, c='black', alpha=0.3) for d_prime in mega_d]
+    d_ax.plot(avg_list, c='black', linewidth=2)
+    d_ax.scatter(x=xticks, y=avg_list, c='black', linewidths=2)
+    d_ax.set_ylim([-0.05, 5])
+    d_ax.set_ylabel('d\' (Sensitivity Index)')
+    d_ax.set_xticks(xticks)
+    d_ax.set_xticklabels(xticks + 1)
+    d_ax.set_xlabel('Session')
+
+    # Save figure if requested
+    if save:
+        save = Path(save)
+        os.makedirs(save.parent, exist_ok=True)
+        print(f'Saving to: {save}')
+        fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
+        fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600)
+
+    plt.show()
+    return
+
 
 def plot_RT(mouse_data, save=False, sem=True):
     """
