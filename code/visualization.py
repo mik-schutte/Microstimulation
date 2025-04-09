@@ -506,12 +506,12 @@ def plot_d_prime(mouse_data, save=False):
     plt.show()
 
 
-def plot_lickPerformance(mouse_data, save=False, peak=False):
+def plot_lickPerformance(mouse_data, save=False, show=True, plotCatch=True):
     # TODO why are some of the first licks occluded by the stimulus?
     """Plots lick performance for stimulus and catch trials in a 2-row raster plot"""
 
     # Check for peaking (limit to first 2 sessions if peak=True)
-    n_sessions = 2 if peak else len(mouse_data.sessions)
+    n_sessions = len(mouse_data.sessions)
 
     # Set figure basics 
     fig, axs = plt.subplots(2, n_sessions, figsize=(15, 12), sharex=False) # 2 rows: Stimuli (top) & Catch (bottom)
@@ -521,8 +521,6 @@ def plot_lickPerformance(mouse_data, save=False, peak=False):
 
     # Get and plot data for every session
     for idx, session in enumerate(mouse_data.sessions):
-        if peak and idx == n_sessions:
-            break  # Stop after 2 sessions if peak=True
 
         # Select Stimulus and Catch trials
         stimTrials = select_trialType(mouse_data.session_data[session], trialType=1)
@@ -570,7 +568,16 @@ def plot_lickPerformance(mouse_data, save=False, peak=False):
         fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
         fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600)
 
-    plt.show()
+    # # For when you only want the axs to use as a subplot
+    # if show:
+    #     plt.show() # TODO this doesn't yield a nice plot if you only want stim trials
+    # if plotCatch:
+    #     return axs
+    # else: # If plotCatch is False then only return the row with stimulus trial licks (Hits)
+    #     return axs[0,:]
+    
+    plt.show
+    return
 
 
 def plot_FLicks(mouse, save=False):
@@ -789,19 +796,15 @@ def plot_d_prime(mouse_data, save=False):
     # TODO why individual function and max_sessions given?
     # TODO remove this function and replace by np.mean and np.std
     # TODO what is the std from, dprime over single session? std is zero if iterating over single session
-    avg_list, std_list = get_avg_std_threshold(mega_d, max_sessions=3) # avg_list is the average dprime of each session in an individual mouse
-
-    xticks = np.arange(0, len(avg_list), 1)
-    # print(avg_list)
-    # avg_list = np.mean(mega_d, axis=0) # This is
-    # print(avg_list)
-
+    avg_list, std_list = get_avg_std_threshold(mega_d, max_sessions=len(mouse.sessions)) # avg_list is the average dprime of each session in an individual mouse
 
     # Ploterdeplot
     fig = plt.figure(figsize=(3,6))
+    xticks = np.arange(0, len(avg_list), 1)
     # Individual lines and points
     [plt.plot(d_prime, c='black', alpha=0.25) for d_prime in mega_d] 
     [plt.scatter(x=xticks,y=d_prime, c='black', alpha=0.3) for d_prime in mega_d]  
+    
     # Average
     plt.plot(avg_list, c='black', linewidth=2)
     plt.scatter(x=xticks, y=avg_list, c='black', linewidths=2)
@@ -813,10 +816,10 @@ def plot_d_prime(mouse_data, save=False):
 
     # Format
     plt.ylim([-0.05, np.max(avg_list)+0.1])
-    # plt.yticks([0,1,2,3,4])
     plt.ylabel('d\' (Sensitivity Index)')
-    # plt.xticks(xticks, [1,2,3,4])
+    plt.xticks(xticks, xticks+1)
     plt.xlabel('Session')
+    plt.title(mouse.id)
 
     if save:
         save = Path(save)
