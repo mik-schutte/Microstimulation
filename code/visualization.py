@@ -701,10 +701,10 @@ def plot_Plick(mouse_data, save=False):
 def plot_metrics(mouse, save=False):
     ''' The plot for showing all behavioural data: Plick, dprime, Rate Correct, RT
     '''
-    fig = plt.figure(figsize=(15, 10))  # Adjusted figure size for 2 rows x 2 columns
+    fig = plt.figure(figsize=(14, 7))  # Adjusted figure size for 2 rows x 2 columns
     fig.suptitle(mouse.id)
     fig.patch.set_facecolor('white')
-    gs0 = GridSpec(2, 2, height_ratios=[1, 1], wspace=0.3, hspace=0.3)  # Adjusted for 2 rows, 2 columns
+    gs0 = GridSpec(2, 2, height_ratios=[1, 1], hspace=0.25)  # Adjusted for 2 rows, 2 columns
     
     # PLICK
     Plick_ax = fig.add_subplot(gs0[0, 0])
@@ -729,13 +729,23 @@ def plot_metrics(mouse, save=False):
 
     for session_name in mouse.sessions:
         session = mouse.session_data[session_name]
+
+        # HIT
         stim_trials = select_trialType(session, 'test')
-        stim_trials = stim_trials.loc[stim_trials['success'] == True]
-        rt_stim = np.average(stim_trials['response_t'])
+        stim_trials = stim_trials.loc[stim_trials['success'] == True] # Because only trials that had succesful lick have a meaningful response time
+        if len(stim_trials) > 0:
+            rt_stim = np.average(stim_trials['response_t'])
+        else:
+            rt_stim = 0
         rt_stim_indi.append(rt_stim)
+
+     #FALSE POSITIVE
         catch_trials = select_trialType(session, 'catch')
         catch_trials = catch_trials.loc[catch_trials['success'] == True]
-        rt_catch = np.average(catch_trials['response_t'])
+        if len(catch_trials) > 0:
+            rt_catch = np.average(catch_trials['response_t'])
+        else:
+            rt_catch = 0
         rt_catch_indi.append(rt_catch)
 
         RT_dict['stim'].append(rt_stim_indi)
@@ -752,8 +762,8 @@ def plot_metrics(mouse, save=False):
     RT_ax.scatter(x, catch_avg, c='orange')
     RT_ax.errorbar(x, stim_avg, yerr=stim_std, c='green', capsize=5)
     RT_ax.errorbar(x, catch_avg, yerr=catch_std, c='orange', capsize=5)
-    RT_ax.set_ylim([0, 1.2])
-    RT_ax.set_yticks(np.arange(0, 1.2, 0.2))
+    RT_ax.set_ylim([0, 1.7])
+    # RT_ax.set_yticks(np.arange(0, 1.5, 0.2))
     RT_ax.set_xlim([-0.5, len(stim_avg) - 0.5])
     RT_ax.set_xticks(x)
     RT_ax.set_xticklabels(x+1)
@@ -803,6 +813,9 @@ def plot_metrics(mouse, save=False):
     d_ax.set_xticks(xticks)
     d_ax.set_xticklabels(xticks + 1)
     d_ax.set_xlabel('Session')
+
+    # Adjust spacing
+    fig.subplots_adjust(top=0.92)  # Reduce the space between the title and the plots
 
     # Save figure if requested
     if save:
