@@ -245,7 +245,7 @@ def omni_plot(mouse):
 
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})   
 
-def plot_raster_rt(mouse_data, save=False, peak=False):
+def plot_raster_rt(mouse_data, save=False):
     ''' Creates a figure containing rasterplots of the trial response time.
 
         INPUT:
@@ -256,10 +256,7 @@ def plot_raster_rt(mouse_data, save=False, peak=False):
             raster_rt_plot(matplotlib.plt): either a plot is shown or saved
     '''
     # Check for peaking allowing the user to only see the plots of the first 2 sessions
-    if peak:
-        n_sessions = 2
-    else:
-        n_sessions = len(mouse_data.sessions)
+    n_sessions = len(mouse_data.sessions)
     # Set figure basics 
     fig, axs = plt.subplots(1, n_sessions, figsize=(12, 6)) # Size plot according to the number of sessions
     plt.subplots_adjust(wspace=1.) 
@@ -275,8 +272,6 @@ def plot_raster_rt(mouse_data, save=False, peak=False):
     
     # Get and plot data for every session
     for idx, session in enumerate(mouse_data.sessions):
-        if peak and idx == n_sessions:
-            break
         colors = []
         
         # For pairing only pair and mix data are important
@@ -506,59 +501,63 @@ def plot_d_prime(mouse_data, save=False):
     plt.show()
 
 
-def plot_lickPerformance(mouse_data, save=False, show=True, plotCatch=True):
-    # TODO why are some of the first licks occluded by the stimulus?
+def plot_lickPerformance(mouse_data, save=False, freq_disc=False, show=True, plotCatch=True):
     """Plots lick performance for stimulus and catch trials in a 2-row raster plot"""
-
-    # Check for peaking (limit to first 2 sessions if peak=True)
-    n_sessions = len(mouse_data.sessions)
-
+    n_sessions = len(mouse_data.sessions)    
     # Set figure basics 
-    fig, axs = plt.subplots(2, n_sessions, figsize=(15, 12), sharex=False) # 2 rows: Stimuli (top) & Catch (bottom)
-    plt.subplots_adjust(wspace=0.3, hspace=0.3)  # Adjust spacing
+    # Make each subplot
+    fig, axs = plt.subplots(2, n_sessions, figsize=(3 * n_sessions, 10), sharex=False)  # Wider subplots
+    plt.subplots_adjust(wspace=0.4, hspace=0.4)  # More spacing between plots to avoid overlapping axis text
     fig.patch.set_facecolor('white')
-    fig.suptitle(str(mouse_data.id), y=0.955)
+    fig.suptitle(str(mouse_data.id), y=0.95)  # Slightly higher to fit titles below
 
-    # Get and plot data for every session
+    # Determine axis titles based on protocol type
+    if freq_disc:
+        topTitle = r'CS+ Trial #'
+        bottomTitle = 'CS- Trial#'
+    else: 
+        topTitle = r'$\mu$Stim Trial #'
+        bottomTitle = 'Catch Trial #'
+
+    # Loop through each session and plot
     for idx, session in enumerate(mouse_data.sessions):
-
         # Select Stimulus and Catch trials
         stimTrials = select_trialType(mouse_data.session_data[session], trialType=1)
         catchTrials = select_trialType(mouse_data.session_data[session], trialType=2)
 
-        # ---- PLOT STIMULUS TRIALS (Top Row: axs[0, idx]) ----
+        # PLOT STIMULUS TRIALS/GO-TRIALS (Top Row: axs[0, idx]) 
         for i, trialData in enumerate(stimTrials.iterrows()):
-            trialData = trialData[1]  # Extract trial data
+            trialData = trialData[1]
             curatedLicks = curateLicks(trialData)
             if len(curatedLicks) > 0:
                 axs[0, idx].eventplot(curatedLicks[1:], lineoffsets=i, colors='black', linewidths=0.75, zorder=1)
                 axs[0, idx].eventplot([curatedLicks[0]], lineoffsets=i, colors='green', linewidths=5, zorder=2)
 
         axs[0, idx].invert_yaxis()
-        axs[0, idx].set_xlim([-0.5, 1.7])
-        axs[0, idx].set_xticks([-0.5, 0, 0.5, 1, 1.5])
+        axs[0, idx].set_xlim([-0.5, 2])
+        axs[0, idx].set_xticks([0, 1, 2])
         axs[0, idx].set_ylim([len(stimTrials)+1, 0])
-        axs[0, idx].set_ylabel(r'$\mu$Stim trials')
+        axs[0, 0].set_ylabel(topTitle)
         axs[0, idx].set_xlabel('Time (s)')
         axs[0, idx].set_title(f'{session}')
-        [axs[0, idx].axvline(i, c='gray') for i in np.arange(0, 0.2, 0.01)] # Mark stimulus 
+        [axs[0, idx].axvline(i, c='gray') for i in np.arange(0, 0.2, 0.01)]  # Mark stimulus onset
 
-        # ---- PLOT CATCH TRIALS (Bottom Row: axs[1, idx]) ----
+        #PLOT CATCH TRIALS/NO-GO-TRIALS
         for i, trialData in enumerate(catchTrials.iterrows()):
-            trialData = trialData[1]  # Extract trial data
+            trialData = trialData[1]
             curatedLicks = curateLicks(trialData)
             if len(curatedLicks) > 1:
-                axs[1, idx].eventplot(curatedLicks, lineoffsets=i, colors='black', linewidths=0.75)  
+                axs[1, idx].eventplot(curatedLicks, lineoffsets=i, colors='black', linewidths=0.75)
                 axs[1, idx].eventplot([curatedLicks[0]], lineoffsets=i, colors='orange', linewidths=3, zorder=2)
 
         axs[1, idx].invert_yaxis()
-        axs[1, idx].set_xlim([-0.5, 1.7])
-        axs[1, idx].set_xticks([-0.5, 0, 0.5, 1, 1.5])
+        axs[1, idx].set_xlim([-0.5, 2])
+        axs[1, idx].set_xticks([0, 1, 2])
         axs[1, idx].set_ylim([len(catchTrials)+1, 0])
-        axs[1, idx].set_ylabel('Catch Trial #')
+        axs[1, 0].set_ylabel(bottomTitle)
         axs[1, idx].set_xlabel('Time (s)')
         axs[1, idx].set_title(f'{session}')
-        [axs[1, idx].axvline(i, c='gray') for i in np.arange(0, 0.2, 0.01)] # Mark stimulus 
+        [axs[1, idx].axvline(i, c='gray') for i in np.arange(0, 0.2, 0.01)]  # Mark stimulus
 
     # Save figure if requested
     if save:
@@ -568,16 +567,23 @@ def plot_lickPerformance(mouse_data, save=False, show=True, plotCatch=True):
         fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
         fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600)
 
-    # # For when you only want the axs to use as a subplot
+    # Final layout fix to make sure everything fits (especially suptitle and axis labels)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust the padding between and around subplots.
+
+    # Show or return axes depending on flags
+    if show:
+        plt.show()
+    
+        # # For when you only want the axs to use as a subplot
     # if show:
     #     plt.show() # TODO this doesn't yield a nice plot if you only want stim trials
     # if plotCatch:
     #     return axs
     # else: # If plotCatch is False then only return the row with stimulus trial licks (Hits)
     #     return axs[0,:]
-    
-    plt.show
-    return
+
+    return #axs if plotCatch else axs[0, :]
+
 
 
 def plot_FLicks(mouse, save=False):
