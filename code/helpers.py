@@ -55,23 +55,9 @@ def get_FirstLick_idx(trialData):
     if len(postLicks) == 0:
         return False
     else: 
-        iFirstLick = postLicks[0]
+        # Return the index of the first lick after stimulation
+        iFirstLick = int(postLicks[0]) # Get the first input after the stimulus # This is often the first index i.e. 0 DO NOT DO IF ELSE CHECKS WITH THIS!!!!
     return iFirstLick
-
-
-def check_lickPause(trialData): #So far this works every time (i.e. is not lower than 3s)
-    '''Checks the time between the last lick before the stimulus. There should be at least 3s in between.
-    '''
-    # Get the index of the first lick after stimulus
-    iFirstLick = get_FirstLick_idx(trialData)
-
-    # If this iFirstLick was False than there were either no licks, or no licks post stimulation
-    if iFirstLick:
-        licks = trialData['licks']
-        lickPause = licks[iFirstLick] - licks[iFirstLick-1] # Check the difference between the first lick post stim and the last lick before
-        return lickPause
-    else:
-        return False
 
 
 def curateLicks(trialData):
@@ -92,7 +78,8 @@ def curateLicks(trialData):
     # iFirstLick is based on the first lick after stim offset
     iFirstLick = get_FirstLick_idx(trialData)
 
-    if iFirstLick: 
+    # Check if get_FirstLick yielded any results for curation
+    if type(iFirstLick) == int: 
         curatedLicks = licks[iFirstLick:] - stim_t
     elif iFirstLick == False:
         curatedLicks = np.array([])
@@ -151,7 +138,7 @@ def get_PLick(mouse, catchInf=True, binsize=0):
             catch_hit = catch.loc[catch['success'] == True]
 
             mstimP = len(mstim_hit) / len(mstim) if len(mstim) > 0 else len(mstim_hit) / binsize # But the last values don't matter cuz they are fake i.e. duplicate of df.tail
-            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else len(mstim_hit) / binsize
+            catchP = len(catch_hit) / len(catch) if len(catch) > 0 else len(catch_hit) / binsize
             
             mstimP_array.append(mstimP)
             catchP_array.append(catchP)
