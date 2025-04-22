@@ -19,7 +19,7 @@ def format_data(checked_data):
     df['trialType'] = checked_data['SessionData']['TrialTypes']
     df['trialStart'] = checked_data['SessionData']['TrialStartTimestamp']
     df['trialEnd'] = checked_data['SessionData']['TrialEndTimestamp']
-
+    
     stim_t = [trial['States']['Stimulus'][0] for trial in checked_data['SessionData']['RawEvents']['Trial']]
     df['stim_t'] = checked_data['SessionData']['TrialStartTimestamp'] + stim_t
     
@@ -43,10 +43,10 @@ def format_data(checked_data):
             licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1High'])
         if 'BNC1Low' in checked_data['SessionData']['RawEvents']['Trial'][i]['Events'].keys():
             licks = np.append(licks, checked_data['SessionData']['RawEvents']['Trial'][i]['Events']['BNC1Low'])
-        df.at[i, 'licks'] = np.array(sorted(licks)) + df.loc[i, 'trialStart']
+        df.at[i, 'licks'] = np.array(sorted(licks)) + df.loc[i, 'trialStart'] # Get the absolute time of the lick (not relative to trialStart)
     return df
 
-def get_duplicates(folder): # Folder likely is root + ID, all files for animal
+def get_duplicates(folder, path_ext='microstim'): # Folder likely is root + ID, all files for animal
     ''' Goes through all files in the folder and detects which session had duplicates
         INPUT:
             folder(str): path to the folder, likely root + ID + microstim + Session Data
@@ -56,7 +56,7 @@ def get_duplicates(folder): # Folder likely is root + ID, all files for animal
     '''
     # Make a file_list containing all files in the folder and get all session names
     file_list = os.listdir(folder)
-    sessions = [re.split('microstim_', file)[1] for file in file_list] # Remove prefix
+    sessions = [re.split(f'{path_ext}_', file)[1] for file in file_list] # Remove prefix
     sessions = [re.split('.mat', file)[0] for file in sessions] # Remove .mat extension
     session_date = [re.split('_',session)[0] for session in sessions] # Convert to only the date of the day
 
@@ -93,7 +93,6 @@ def check_aborted(trialData):
     return bool_violate, violations
 
 
-# Awesome Mouse_Data class
 class Mouse_Data:
     ''' Class designed for housing all data for an individual mouse
         
@@ -104,9 +103,10 @@ class Mouse_Data:
             Mouse_Data(Class): Dataclass with attributes like id, sessions, all_data and concatenated data
     '''    
 
-    def __init__(self, path_to_data): 
+    def __init__(self, path_to_data, path_ext='microstim'): 
         # From path_to_data get path and files in the raw-folder of that path
-        self.path = path_to_data + 'microstim/Session Data/'
+        self.path = path_to_data + path_ext + '/Session Data/'
+        self.path_ext = path_ext # TODO change name to protocol 
         self.files = os.listdir(self.path)
         self.id = self.files[0].split('/')[-1].split('_')[0]
         self.concat_needed = False
@@ -215,7 +215,7 @@ class Mouse_Data:
                                     an 'old' folder has been added that houses the split data
         ''' 
         # Create a nested dictionary with keys being a duplicate session and values as dictionary of behaviours
-        duplicate_dict = get_duplicates(self.path)
+        duplicate_dict = get_duplicates(self.path, self.path_ext)
         
         # Go through all duplicate sessions
         for session in duplicate_dict.keys():
@@ -232,13 +232,15 @@ class Mouse_Data:
                     # Licktimes of the df are based on BNC input + trialStart we need to remove trialStart again
                     licks = df['licks'] - df['trialStart']
 
-                    endTime = old_df.iloc[-1]['trialEnd']
+                    endTime = old_df.iloc[-1]['trialEnd'] # Append the sessions together by starting from the end of the last session
+
+                    # TODO this seems convoluted cant I add endTime to all three at the same time
                     df['trialStart'] = df['trialStart'] + endTime
                     df['trialEnd'] = df['trialEnd'] + endTime
                     df['stim_t'] = df['stim_t'] + endTime
 
                     # Add the new trialStart to the lickTimes
-                    df['licks'] = licks + df['trialStart']
+                    df['licks'] = licks + df['trialStart'] # To get the absolute time within the session (not within the trial)
 
                     df_concat = pd.concat([old_df, df], ignore_index=True)
                 old_df = df
