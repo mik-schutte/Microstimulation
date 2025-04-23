@@ -15,7 +15,7 @@ from scipy.optimize import curve_fit
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
 from collections import deque
-from scipy.stats import gaussian_kde
+from scipy.interpolate import make_interp_spline
 
 matplotlib.rcParams.update({'font.size':16, 'font.family':'Arial', 'axes.facecolor':'white'})  
 
@@ -585,74 +585,121 @@ def plot_lickPerformance(mouse_data, save=False, freq_disc=False, show=True, plo
     return #axs if plotCatch else axs[0, :]
 
 
-
-def plot_FLicks(mouse, save=False):
-    """
-    Plot the kernel density estimation (KDE) of first lick response times 
-    for mStim and Catch trials from the last session of each mouse.
-
-    Parameters:
-    - mice: A single mouse object or a list of mouse objects
+def plot_FLicks(mouse_data, save=False, freq_disc=False, show=True, plotLine=False, plotCatch=True, bin_size=0.1):
+    """Plots overlaid lick frequency histograms or smoothed frequency curves for stimulus (TrialType 1) and catch (TrialType 2) trials per session.
+    
+    If `plotLine` is False (default), a histogram of lick frequency (Hz) is plotted.
+    If `plotLine` is True, a smooth curve is plotted through the tops of the histogram bins to visualize lick rate dynamics across time.
     """
 
-    RTs_mstim = []
-    RTs_catch = []
+    # Set figure basics
+    n_sessions = len(mouse_data.sessions)   # How many sessions to plot
+    # One row of subplots; each subplot shows data for one session (Stim and Catch)
+    fig, axs = plt.subplots(1, n_sessions, figsize=(3 * n_sessions, 5), sharex=True, sharey=True)
+    if n_sessions == 1:
+        axs = np.array([axs])  # Ensure axs is always iterable (even for one session)
+    plt.subplots_adjust(wspace=0.4)  # Add space between plots to prevent label overlap
+    fig.patch.set_facecolor('white')  # Set background to white for clarity
+    fig.suptitle(str(mouse_data.id), y=0.95)  # Set mouse ID as figure title
 
-    # Select the last session
-    session = mouse.sessions[-1]  # Last session
-    session_data = mouse.session_data[session]
-
-    # Select trial types and filter for success
-    mstim = select_trialType(session_data, 'test')
-    catch = select_trialType(session_data, 'catch')
-    mstim = mstim[mstim['success'] == True]
-    catch = catch[catch['success'] == True]
-
-    if not mstim.empty:
-        RTs_mstim.append(mstim['response_t'])
-
-    if not catch.empty:
-        RTs_catch.append(catch['response_t'])
-
-    # Combine into single series (skip if no data)
-    RTs_mstim = pd.concat(RTs_mstim) if RTs_mstim else pd.Series(dtype=float)
-    RTs_catch = pd.concat(RTs_catch) if RTs_catch else pd.Series(dtype=float)
-
-    # X-axis for KDE
-    x = np.arange(-1, 2, 0.01)
-
-    # Create plot
-    fig, ax = plt.subplots(figsize=(6, 6))
-    [ax.axvline(i, ymin=0, ymax=3, c='gray', alpha=0.1) for i in np.arange(0, 0.2, 0.001)]
-
-    # KDE lines
-    if not RTs_mstim.empty:
-        density_mstim = gaussian_kde(RTs_mstim)
-        ax.plot(x, density_mstim(x), c='green', label=r'$\mu$Stim')
-
-    if not RTs_catch.empty:
-        density_catch = gaussian_kde(RTs_catch)
-        ax.plot(x, density_catch(x), c='gray', label='Catch')
+    # Set TrialType labels depending on whether this was a frequency discrimination task
+    if freq_disc:
+        label_one = r'CS+'
+        label_two = 'CS-'
     else:
-        ax.plot(x, np.zeros(len(x)), c='gray', label='Catch (no data)')
+        label_one = r'$\mu$Stim'
+        label_two = 'Catch'
 
-    # Formatting
-    ax.set_xlim([-1, 2])
-    ax.set_ylim([-0.2, 5])
-    ax.set_xlabel('Time from Stimulus Onset (s)')
-    ax.set_ylabel('First Licks (Hz)')
-    ax.set_title('First Licks (KDE) — Last Session')
-    ax.legend()
-    plt.tight_layout()
+    # Define histogram bin edges for a 2.5s window centered on stimulus
+    time_bins = np.arange(-0.5, 2 + bin_size, bin_size)
+    bin_centers = time_bins[:-1] + bin_size / 2  # Center of each bin, for plotting the curve
 
-    # Save the plot
+    # Loop through each session to collect and plot lick data
+    for idx, session in enumerate(mouse_data.sessions):
+        # Select stimulus and catch trials for current session
+        stimTrials = select_trialType(mouse_data.session_data[session], trialType=1)
+        catchTrials = select_trialType(mouse_data.session_data[session], trialType=2)
+
+        # Total number of trials for normalization
+        n_stim = len(stimTrials)
+        n_catch = len(catchTrials)
+
+        # Accumulate all licks for stimulus trials
+        lick_times_stim = []
+        for _, trialData in stimTrials.iterrows():
+            curatedLicks = curateLicks(trialData)
+            lick_times_stim.extend(curatedLicks)
+
+        # Accumulate all licks for catch trials
+        lick_times_catch = []
+        for _, trialData in catchTrials.iterrows():
+            curatedLicks = curateLicks(trialData)
+            lick_times_catch.extend(curatedLicks)
+
+        # Plot stimulus (or GO Trials)
+        if n_stim > 0:
+            stim_counts, _ = np.histogram(lick_times_stim, bins=time_bins)
+            stim_rate = stim_counts / (n_stim * bin_size)  # Convert to licks/sec/trial (Hz)
+
+            if plotLine:
+                # Interpolate a smooth curve through the tops of the bins to visualize trend
+                if len(stim_rate) >= 4:  # Need at least 4 points for cubic interpolation TODO what happens if stim_Rate too low?
+                    spline_stim = make_interp_spline(bin_centers, stim_rate, k=3)
+                    smooth_x = np.linspace(bin_centers[0], bin_centers[-1], 500)
+                    axs[idx].plot(smooth_x, spline_stim(smooth_x), color='green', label=label_one)
+                else:
+                    axs[idx].plot(bin_centers, stim_rate, color='green', label=label_one) # TODO this should then just show a flat line
+            else:
+                # Normal histogram (lick frequency per bin)
+                axs[idx].bar(time_bins[:-1], stim_rate, width=bin_size, color='green', alpha=0.5, align='edge', label=label_one)
+
+        # ---- PLOT CATCH TRIALS (TRIALTYPE 2) ----
+        if n_catch > 0:
+            catch_counts, _ = np.histogram(lick_times_catch, bins=time_bins)
+            catch_rate = catch_counts / (n_catch * bin_size)  # Convert to licks/sec/trial (Hz)
+
+            if plotLine:
+                # Interpolate a smooth curve through the tops of the bins to visualize trend
+                if len(catch_rate) >= 4:
+                    spline_catch = make_interp_spline(bin_centers, catch_rate, k=3)
+                    smooth_x = np.linspace(bin_centers[0], bin_centers[-1], 500) # TODO why these binsizes
+                    axs[idx].plot(smooth_x, spline_catch(smooth_x), color='orange', label=label_two)
+                else:
+                    axs[idx].plot(bin_centers, catch_rate, color='orange', label=label_two)
+                # Baseline reference at y=0
+                axs[idx].axhline(0, color='black', linewidth=0.8, linestyle='--', zorder=0)  
+            else:
+                # Normal histogram (lick frequency per bin)
+                axs[idx].bar(time_bins[:-1], catch_rate, width=bin_size, color='orange', alpha=0.5, align='edge', label=label_two)
+
+        # Add stimulus alignment marker (0–0.2s range marked in gray lines)
+        [axs[idx].axvline(i, c='gray') for i in np.arange(0, 0.2, 0.01)]
+        axs[idx].set_xlim([-0.5, 2])  # Fixed time window
+        axs[idx].set_xlabel('Time (s)')
+        axs[idx].set_title(f'{session}')
+
+        # Only first subplot gets y-label and legend for clarity
+        if idx == 0:
+            axs[idx].set_ylabel('Lick (Hz)')  # Frequency of licks per bin per trial
+            axs[idx].legend(loc='upper right', fontsize='small')
+
+    # Save figure if requested
     if save:
         save = Path(save)
         os.makedirs(save.parent, exist_ok=True)
-        print(f'Saving to: {save }')
+        print(f'Saving to: {save}')
         fig.savefig(save.with_suffix('.svg'), bbox_inches='tight', dpi=600)
-        fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600) 
-    plt.show()
+        fig.savefig(save.with_suffix('.jpg'), bbox_inches='tight', dpi=600)
+
+    # Final layout adjustment to avoid overlap and preserve space for suptitle
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+
+    # Show figure if requested
+    if show:
+        plt.show()
+        return
+
+    return axs
 
 
 def plot_Plick(mouse_data, save=False):
